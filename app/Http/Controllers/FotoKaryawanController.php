@@ -9,41 +9,56 @@ use Symfony\Component\HttpFoundation\Response;
 
 class FotoKaryawanController extends Controller
 {
-    // Streaming foto privat (inline).
-    // HANYA pemilik yang boleh akses (admin juga tidak boleh lihat milik orang lain).
-    public function photo(Karyawan $karyawan)
+    /** ADMIN: boleh lihat foto siapa saja. */
+    public function photoAdmin(Karyawan $karyawan)
     {
-        // Ambil user yang sedang login
         $user = Auth::user();
         if (!$user) {
-            abort(Response::HTTP_UNAUTHORIZED); // 401 jika belum login
+            abort(Response::HTTP_UNAUTHORIZED);
         }
 
-        // Tentukan ID karyawan yang dimiliki user login
-        // Catatan: gunakan id_karyawan jika ada, fallback ke id (jaga-jaga skema lama)
+        $isAdmin =
+            (method_exists($user, 'hasRole') && $user->hasRole('admin')) ||
+            (($user->role ?? null) === 'admin') ||
+            ((optional($user->karyawan)->role ?? null) === 'admin');
+
+        if (!$isAdmin) {
+            abort(Response::HTTP_FORBIDDEN);
+        }
+
+        return $this->streamPhotoOr404($karyawan);
+    }
+
+    /** SELF: hanya pemilik (user login) yang boleh akses. */
+    public function photoSelf(Karyawan $karyawan)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            abort(Response::HTTP_UNAUTHORIZED);
+        }
+
+        // gunakan id_karyawan jika ada, fallback ke id user
         $ownId = $user->id_karyawan ?? $user->id;
 
-        // Bandingkan dengan ID dari parameter (Route Model Binding Karyawan)
-        // Jika bukan miliknya, tolak akses (meski role admin sekalipun)
         if ((int) $ownId !== (int) $karyawan->getKey()) {
-            abort(Response::HTTP_FORBIDDEN); // 403 untuk akses terlarang
+            abort(Response::HTTP_FORBIDDEN);
         }
 
-        // Pastikan path foto ada dan file eksis di storage privat (disk 'local')
+        return $this->streamPhotoOr404($karyawan);
+    }
+
+    private function streamPhotoOr404(Karyawan $karyawan)
+    {
         if (!$karyawan->foto || !Storage::disk('local')->exists($karyawan->foto)) {
-            abort(Response::HTTP_NOT_FOUND); // 404 jika tidak ditemukan
+            abort(Response::HTTP_NOT_FOUND);
         }
 
-        // Ambil absolute path untuk dikirim ke response()->file()
-        // Disk 'local' biasanya mengarah ke storage/app (atau storage/app/private sesuai konfigurasi)
         $path = Storage::disk('local')->path($karyawan->foto);
 
-        // Kembalikan file secara inline agar dapat di-preview oleh browser
-        // Catatan: mime_content_type dapat gagal di environment tertentu; pertimbangkan fallback default.
         return response()->file($path, [
-            'Content-Type'        => mime_content_type($path),
+            'Content-Type'        => @mime_content_type($path) ?: 'application/octet-stream',
             'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
-            'Cache-Control'       => 'private, no-store, max-age=0', // hindari cache publik
+            'Cache-Control'       => 'private, no-store, max-age=0',
         ]);
     }
 }

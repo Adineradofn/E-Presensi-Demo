@@ -136,7 +136,7 @@
                             <div 
                                 x-show="jenis==='izin terlambat'" 
                                 class="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"
-                            >Otomatis = mulai</div>
+                            >Hanya untuk 1 Hari</div>
                         </div>
                         <p x-show="akhir && mulai && akhir < mulai" class="mt-1 text-xs text-red-600">
                             Tanggal selesai tidak boleh sebelum tanggal mulai.

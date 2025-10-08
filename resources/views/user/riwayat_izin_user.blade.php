@@ -119,14 +119,11 @@
                             </div>
                             <span
                                 class="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium {{ $statusClass }}">
-                                <span class="mr-1.5 h-1.5 w-1.5 rounded-full bg-current/70"></span>
                                 {{ ucfirst($row['status']) }}
                             </span>
                         </header>
 
                         {{-- Meta ringkas & rata baseline --}}
-
-
                         <ul class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
                             <li class="flex items-center gap-1.5">
                                 {{-- jenis --}}
@@ -149,7 +146,6 @@
                     </article>
                 @endforeach
             </div>
-
 
             {{-- TABEL (Tablet & Desktop) --}}
             <div class="hidden sm:block overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -180,7 +176,6 @@
                                     <td class="px-5 py-3">
                                         <span
                                             class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold {{ $jenisClass }}">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-current/70"></span>
                                             {{ ucfirst($row['jenis']) }}
                                         </span>
                                     </td>
@@ -190,7 +185,6 @@
                                     <td class="px-5 py-3">
                                         <span
                                             class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold {{ $statusClass }}">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-current/70"></span>
                                             {{ ucfirst($row['status']) }}
                                         </span>
                                     </td>

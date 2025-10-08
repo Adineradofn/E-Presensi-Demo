@@ -13,21 +13,27 @@ use RealRashid\SweetAlert\Facades\Alert;
 
 class SelfProfile extends Component
 {
-    use WithFileUploads; // dukungan upload sementara Livewire
+    use WithFileUploads;
 
-    // STATE FORM EDIT PROFIL (diri sendiri)
+    /**
+     * STATE FORM EDIT (khusus diri sendiri)
+     * HANYA: nama, alamat, email, foto (opsional ganti/hapus)
+     */
     public $edit = [
-        'id' => null,
-        'nik' => '',
-        'nama' => '',
+        'id'     => null,
+        'nama'   => '',
         'alamat' => '',
-        'email' => '',
-        'divisi' => '',
-        'jabatan' => '',
-        'foto' => null, // Livewire\TemporaryUploadedFile (nullable)
+        'email'  => '',
+        'foto'   => null, // Livewire\TemporaryUploadedFile
     ];
 
-    // STATE FORM UBAH PASSWORD (diri sendiri)
+    /** URL foto saat ini (untuk preview awal) */
+    public $currentPhotoUrl = null;
+
+    /** Flag dari tombol "Hapus Foto" di UI */
+    public $removePhoto = false;
+
+    // STATE FORM UBAH PASSWORD (tetap)
     public $password = [
         'id' => null,
         'nama' => '',
@@ -35,23 +41,19 @@ class SelfProfile extends Component
         'password_confirmation' => '',
     ];
 
-    // Pesan validasi (Bahasa Indonesia)
+    // Pesan validasi
     protected $messages = [
-        // umum
         'required' => ':attribute wajib diisi.',
         'unique'   => ':attribute sudah terdaftar.',
-        'max'      => ':attribute maksimal :max karakter.', // untuk STRING
+        'max'      => ':attribute maksimal :max karakter.',
+        'email'    => 'Format email tidak valid.',
 
-        'email' => 'Format email tidak valid.',
-        'image' => 'File harus berupa gambar.',
-        'mimes' => 'Format file harus: :values.',
-
-        // password (kalau dipakai di validate() dengan key password.password*)
+        // password
         'password.password.min'       => 'Password minimal 6 karakter.',
         'password.password.regex'     => 'Password wajib memiliki ≥1 huruf besar & ≥1 angka.',
         'password.password.confirmed' => 'Konfirmasi password tidak cocok.',
 
-        // ✅ Override khusus FOTO (supaya tidak pakai “karakter”):
+        // foto
         'edit.foto.max'   => 'Ukuran foto maksimal 2 MB.',
         'edit.foto.mimes' => 'Format foto harus JPG, JPEG, PNG, atau WebP.',
         'edit.foto.image' => 'File harus berupa gambar.',
@@ -59,58 +61,60 @@ class SelfProfile extends Component
 
     // Label atribut
     protected $validationAttributes = [
-        'edit.nik' => 'NIK',
-        'edit.nama' => 'Nama',
+        'edit.nama'   => 'Nama',
         'edit.alamat' => 'Alamat',
-        'edit.email' => 'Email',
-        'edit.divisi' => 'Divisi',
-        'edit.jabatan' => 'Jabatan',
-        'edit.foto' => 'Foto',
+        'edit.email'  => 'Email',
+        'edit.foto'   => 'Foto',
         'password.password' => 'Password',
         'password.password_confirmation' => 'Konfirmasi Password',
     ];
 
-    // Aturan validasi edit profil diri sendiri
+    /** Aturan validasi edit diri sendiri */
     protected function rulesEditSelf($id)
     {
         return [
-            'edit.nik'     => ['required', 'max:100', Rule::unique('karyawan', 'nik')->ignore($id, 'id_karyawan')],
-            'edit.nama'    => ['required', 'max:100'],
-            'edit.alamat'  => ['required', 'max:255'],
-            'edit.email'   => ['required', 'email', 'max:150', Rule::unique('karyawan', 'email')->ignore($id, 'id_karyawan')],
-            'edit.divisi'  => ['required', 'max:100'],
-            'edit.jabatan' => ['required', 'max:100'],
-            // max:2048 = 2MB (Laravel hitung dalam KB)
-            'edit.foto'    => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'edit.nama'   => ['required', 'max:100'],
+            'edit.alamat' => ['required', 'max:255'],
+            'edit.email'  => ['required', 'email', 'max:150', Rule::unique('karyawan', 'email')->ignore($id, 'id')],
+            'edit.foto'   => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'], // 2MB
         ];
     }
 
-    // Render
     public function render()
     {
         return view('livewire.shared.self-profile');
     }
 
-    // Prefill edit dari user login
+    /** Prefill form dari user login + siapkan URL foto untuk preview awal */
     public function fillFromAuth(): void
     {
         $me = Auth::user();
         abort_unless($me, 401);
 
         $this->resetValidation();
+
         $this->edit = [
-            'id'     => $me->id_karyawan,
-            'nik'    => $me->nik,
+            'id'     => $me->getKey(), // <- pakai PK yang benar (id)
             'nama'   => $me->nama,
             'alamat' => $me->alamat,
             'email'  => $me->email,
-            'divisi' => $me->divisi,
-            'jabatan'=> $me->jabatan,
-            'foto'   => null, // input file selalu null saat buka form
+            'foto'   => null,
         ];
+
+        $this->currentPhotoUrl = $me->foto
+            ? route('data.karyawan.foto', ['karyawan' => $me->getKey()]) . '?v=' . now()->timestamp
+            : null;
+
+        $this->removePhoto = false;
     }
 
-    // Prefill password dari user login
+    /** Dipanggil dari Alpine untuk baca URL foto saat ini (hindari nama tabrakan properti) */
+    public function getCurrentPhotoUrl(): ?string
+    {
+        return $this->currentPhotoUrl;
+    }
+
+    /** Prefill password tetap */
     public function fillPasswordFromAuth(): void
     {
         $me = Auth::user();
@@ -118,7 +122,7 @@ class SelfProfile extends Component
 
         $this->resetValidation();
         $this->password = [
-            'id' => $me->id_karyawan,
+            'id' => $me->getKey(), // <- pakai id
             'nama' => $me->nama,
             'password' => '',
             'password_confirmation' => '',
@@ -126,8 +130,14 @@ class SelfProfile extends Component
     }
 
     // Helpers reset form
-    public function resetEditForm(): void     { $this->reset('edit'); }
-    public function resetPasswordForm(): void { $this->reset('password'); }
+    public function resetEditForm(): void
+    {
+        $this->reset('edit', 'currentPhotoUrl', 'removePhoto');
+    }
+    public function resetPasswordForm(): void
+    {
+        $this->reset('password');
+    }
 
     /** Update profil diri sendiri */
     public function updateSelf()
@@ -136,40 +146,38 @@ class SelfProfile extends Component
         abort_unless($auth, 401);
 
         $id = $this->edit['id'] ?? null;
-        if ((int) $auth->id_karyawan !== (int) $id) {
+        if ((int) $auth->getKey() !== (int) $id) {
             abort(403, 'Tidak boleh mengubah data milik orang lain dari modal ini.');
         }
 
-        // ✅ Pakai pesan & label yang sudah diset agar foto tidak “2048 karakter”
         $this->validate($this->rulesEditSelf($id), $this->messages, $this->validationAttributes);
 
         DB::beginTransaction();
         try {
             $karyawan = Karyawan::findOrFail($id);
 
-            // LOGIKA FOTO:
-            // - Upload baru → hapus lama & simpan baru
-            // - Tidak upload → hapus lama & set null (sesuai UI “Kosongkan untuk menghapus foto lama”)
+            // === LOGIKA FOTO ===
+            $newPath = $karyawan->foto;
+
             if ($this->edit['foto']) {
+                // Upload baru override removePhoto
                 if ($karyawan->foto && Storage::disk('local')->exists($karyawan->foto)) {
                     Storage::disk('local')->delete($karyawan->foto);
                 }
                 $newPath = $this->edit['foto']->store('karyawan', 'local');
-            } else {
+                $this->removePhoto = false;
+            } elseif ($this->removePhoto) {
                 if ($karyawan->foto && Storage::disk('local')->exists($karyawan->foto)) {
                     Storage::disk('local')->delete($karyawan->foto);
                 }
                 $newPath = null;
             }
 
-            // Update data
+            // Update field yang diizinkan
             $karyawan->update([
-                'nik'    => $this->edit['nik'],
                 'nama'   => $this->edit['nama'],
                 'alamat' => $this->edit['alamat'],
                 'email'  => $this->edit['email'],
-                'divisi' => $this->edit['divisi'],
-                'jabatan'=> $this->edit['jabatan'],
                 'foto'   => $newPath,
             ]);
 
@@ -179,19 +187,21 @@ class SelfProfile extends Component
             $ver = now()->timestamp;
             session()->flash('pf_ver', $ver);
 
-            // Refresh user
+            // Refresh user + perbarui currentPhotoUrl
             $auth->refresh();
             Auth::setUser($auth);
+
+            $this->currentPhotoUrl = $karyawan->foto
+                ? route('data.karyawan.foto', ['karyawan' => $karyawan->getKey()]) . '?v=' . $ver
+                : null;
 
             // Event UI
             $this->dispatch('profile-photo-updated', version: $ver);
             $this->dispatch('self-profile:name-updated', name: $this->edit['nama']);
             $this->dispatch('self-profile:success');
 
-            // Notifikasi
             Alert::success('Berhasil', 'Profil berhasil diupdate');
 
-            // Redirect penuh
             return redirect()->to(
                 request()->headers->get('Referer') ?: url()->current()
             );
@@ -225,7 +235,7 @@ class SelfProfile extends Component
         );
 
         $id = $this->password['id'] ?? null;
-        if ((int) $auth->id_karyawan !== (int) $id) {
+        if ((int) $auth->getKey() !== (int) $id) {
             abort(403, 'Tidak boleh mengubah password milik orang lain dari modal ini.');
         }
 

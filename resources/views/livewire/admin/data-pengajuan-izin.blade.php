@@ -61,28 +61,30 @@
 
     {{-- ========================= DESKTOP TABLE ========================= --}}
     <div class="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm mt-2 hidden sm:block">
-        <table class="min-w-full whitespace-nowrap">
-            <thead class="bg-gray-50 text-left text-gray-700">
+        {{-- table-fixed: tetap tanpa scroll horizontal --}}
+        <table class="min-w-full table-fixed">
+            {{-- SEMUA HEADER RATA TENGAH --}}
+            <thead class="bg-gray-50 text-gray-700">
                 <tr>
-                    <th class="px-4 py-3 text-sm font-semibold">NIK</th>
-                    <th class="px-4 py-3 text-sm font-semibold w-24 text-center">
+                    <th class="px-4 py-3 text-sm font-semibold text-center">NIK</th>
+                    <th class="px-4 py-3 text-sm font-semibold text-center w-24">
                         <span class="block leading-tight">Tanggal</span>
                         <span class="block leading-tight">Pengajuan</span>
                     </th>
-                    <th class="px-4 py-3 text-sm font-semibold">Nama</th>
-                    <th class="px-4 py-3 text-sm font-semibold">Jabatan</th>
-                    <th class="px-4 py-3 text-sm font-semibold">Divisi</th>
-                    <th class="px-4 py-3 text-sm font-semibold">Jenis</th>
-                    <th class="px-4 py-3 text-sm font-semibold w-24 text-center">
+                    <th class="px-4 py-3 text-sm font-semibold text-center w-44">Nama</th>
+                    <th class="px-4 py-3 text-sm font-semibold text-center">Jabatan</th>
+                    <th class="px-4 py-3 text-sm font-semibold text-center">Divisi</th>
+                    <th class="px-4 py-3 text-sm font-semibold text-center">Jenis</th>
+                    <th class="px-4 py-3 text-sm font-semibold text-center w-24">
                         <span class="block leading-tight">Tanggal</span>
                         <span class="block leading-tight">Mulai</span>
                     </th>
-                    <th class="px-4 py-3 text-sm font-semibold w-24 text-center">
+                    <th class="px-4 py-3 text-sm font-semibold text-center w-24">
                         <span class="block leading-tight">Tanggal</span>
                         <span class="block leading-tight">Selesai</span>
                     </th>
-                    <th class="px-4 py-3 text-sm font-semibold">Alasan</th>
-                    <th class="px-4 py-3 text-sm font-semibold">Status</th>
+                    <th class="px-4 py-3 text-sm font-semibold text-center w-56">Alasan</th>
+                    <th class="px-4 py-3 text-sm font-semibold text-center">Status</th>
                     <th class="px-4 py-3 text-sm font-semibold text-center">Aksi</th>
                 </tr>
             </thead>
@@ -110,7 +112,7 @@
                             'sakit' => 'bg-violet-100 text-violet-700',
                             'cuti'  => 'bg-gray-100 text-gray-700',
                             'tugas' => 'bg-emerald-100 text-emerald-700',
-                            default => 'bg-sky-100 text-sky-700', // izin, izin terlambat
+                            default => 'bg-sky-100 text-sky-700',
                         };
                         $statusClass = match ($status) {
                             'disetujui' => 'bg-emerald-100 text-emerald-700',
@@ -118,64 +120,73 @@
                             default     => 'bg-gray-100 text-gray-700',
                         };
 
-                        // ⚙️ Hanya tampilkan tombol edit untuk 'tugas' & 'izin terlambat'
                         $canEdit = in_array($jenis, ['tugas', 'izin terlambat'], true);
                     @endphp
 
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm text-gray-700">{{ $nik }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-700 text-center">{{ $pengajuan }}</td>
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $nama }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-700">{{ $jabatan }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-700">{{ $divisi }}</td>
+                        {{-- Rata tengah & single-line --}}
+                        <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap truncate max-w-[6rem]">{{ $nik }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap">{{ $pengajuan }}</td>
 
-                        <td class="px-4 py-3 text-sm">
-                            <span class="px-2 py-1 rounded-full text-xs font-medium {{ $jenisClass }}">{{ ucfirst($jenis) }}</span>
+                        {{-- NAMA: rata kiri & boleh turun --}}
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900 align-top text-left whitespace-normal break-words">
+                            {{ $nama }}
                         </td>
 
-                        <td class="px-4 py-3 text-sm text-gray-700 text-center">{{ $mulai }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-700 text-center">{{ $akhir }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-700">{{ $alasan }}</td>
+                        {{-- Rata tengah & single-line --}}
+                        <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap truncate max-w-[12rem]" title="{{ $jabatan }}">{{ $jabatan }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap truncate max-w-[10rem]" title="{{ $divisi }}">{{ $divisi }}</td>
 
-                        <td class="px-4 py-3 text-sm">
+                        <td class="px-4 py-3 text-sm text-center whitespace-nowrap">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {{ $jenisClass }} whitespace-nowrap">{{ ucfirst($jenis) }}</span>
+                        </td>
+
+                        <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap">{{ $mulai }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap">{{ $akhir }}</td>
+
+                        {{-- ALASAN: rata kiri & boleh turun --}}
+                        <td class="px-4 py-3 text-sm text-gray-700 align-top text-left whitespace-normal break-words">
+                            {{ $alasan }}
+                        </td>
+
+                        <td class="px-4 py-3 text-sm text-center whitespace-nowrap">
                             <span class="px-2 py-1 rounded-full text-xs font-medium {{ $statusClass }}">{{ ucfirst($status) }}</span>
                         </td>
 
-                        <td class="px-4 py-3 text-sm">
-                            <div class="flex items-center justify-center gap-2">
-                                {{-- View Bukti --}}
+                        {{-- AKSI: kontainer boleh wrap ke bawah jika sempit; item tetap single-line --}}
+                        <td class="px-4 py-3 text-sm text-center">
+                            <div class="flex flex-wrap items-center justify-center gap-2">
+                                {{-- Bukti --}}
                                 <button type="button"
-                                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border hover:bg-gray-50 disabled:opacity-50"
+                                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border hover:bg-gray-50 disabled:opacity-50 overflow-hidden whitespace-nowrap"
                                         title="Lihat bukti" onclick="openBukti(this)" data-url="{{ $buktiUrl }}"
                                         {{ $hasFile ? '' : 'disabled' }}>
-                                    <img src="{{ asset('images/letter_icon.svg') }}" class="h-5 w-5" alt="bukti surat">
-                                    <span class="text-xs text-gray-700">Bukti</span>
+                                    <img src="{{ asset('images/letter_icon.svg') }}" class="h-5 w-5 shrink-0" alt="bukti surat">
+                                    <span class="text-xs text-gray-700 truncate">Bukti</span>
                                 </button>
 
-                                {{-- Ubah Status: tampilkan HANYA jika boleh diedit --}}
+                                {{-- Edit Status (muncul hanya jika boleh) --}}
                                 @if ($canEdit)
                                     <button type="button"
-                                            class="group inline-flex items-center justify-center rounded-full p-2 transition hover:bg-gray-100 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                                            class="px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-sm"
                                             title="Ubah Status"
                                             aria-label="Ubah Status {{ $nama }} {{ $mulai }}-{{ $akhir }}"
                                             @click="
                                                 $store.izinModal.openWith({
                                                     targetId: 'edit_status_izin',
-                                                    currentStatus: @js($status), // opsi di modal: pending|disetujui|ditolak
+                                                    currentStatus: @js($status),
                                                     nama: @js($nama === '-' ? '' : $nama),
                                                     mulai: @js($mulai === '-' ? '' : $mulai),
                                                     akhir: @js($akhir === '-' ? '' : $akhir)
                                                 });
-                                                $wire.set('selectedIzinId', {{ $row->id }});   // pk standar
+                                                $wire.set('selectedIzinId', {{ $row->id }});
                                                 $wire.set('initialStatus', @js($status));
                                                 $wire.set('selectedStatus', @js($status));
                                                 $wire.set('selectedNama', @js($nama === '-' ? '' : $nama));
                                                 $wire.set('selectedMulai', @js($mulai === '-' ? '' : $mulai));
                                                 $wire.set('selectedAkhir', @js($akhir === '-' ? '' : $akhir));
                                             ">
-                                        <img src="{{ asset('images/edit_icon.svg') }}" alt=""
-                                             class="size-5 opacity-90 transition group-hover:opacity-100 group-hover:scale-110 group-hover:drop-shadow"
-                                             loading="lazy" width="20" height="20" />
+                                        Edit
                                     </button>
                                 @endif
                             </div>
@@ -224,7 +235,6 @@
                     default     => 'bg-gray-100 text-gray-700',
                 };
 
-                // ⚙️ Hanya tampilkan tombol edit untuk 'tugas' & 'izin terlambat'
                 $canEdit = in_array($jenis, ['tugas', 'izin terlambat'], true);
             @endphp
 
@@ -238,7 +248,7 @@
                     </div>
                     <div class="shrink-0 text-right">
                         <div>
-                            <span class="inline-block px-2 py-1 rounded-full text-[11px] font-medium {{ $jenisClass }}">{{ ucfirst($jenis) }}</span>
+                            <span class="inline-block px-2 py-1 rounded-full text-[11px] font-medium {{ $jenisClass }} whitespace-nowrap">{{ ucfirst($jenis) }}</span>
                         </div>
                         <div class="mt-1">
                             <span class="inline-block px-2 py-1 rounded-full text-[11px] font-medium {{ $statusClass }}">{{ ucfirst($status) }}</span>
@@ -269,40 +279,36 @@
                 </div>
 
                 {{-- Actions --}}
-                <div class="mt-4 flex items-center gap-2">
+                <div class="mt-4 flex flex-wrap items-center gap-2 justify-center">
                     <button type="button"
-                            class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border hover:bg-gray-50 disabled:opacity-50"
+                            class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border hover:bg-gray-50 disabled:opacity-50 overflow-hidden whitespace-nowrap"
                             title="Lihat bukti" onclick="openBukti(this)" data-url="{{ $buktiUrl }}"
                             {{ $hasFile ? '' : 'disabled' }}>
-                        <img src="{{ asset('images/letter_icon.svg') }}" class="h-5 w-5" alt="bukti surat">
-                        <span class="text-xs text-gray-700">Bukti</span>
+                        <img src="{{ asset('images/letter_icon.svg') }}" class="h-5 w-5 shrink-0" alt="bukti surat">
+                        <span class="text-xs text-gray-700 truncate">Bukti</span>
                     </button>
 
-                    {{-- Ubah Status: tampilkan HANYA jika boleh diedit --}}
                     @if ($canEdit)
                         <button type="button"
-                                class="flex-1 group inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 transition hover:bg-gray-100 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                               class="px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-sm"
                                 title="Ubah Status"
                                 aria-label="Ubah Status {{ $nama }} {{ $mulai }}-{{ $akhir }}"
                                 @click="
                                     $store.izinModal.openWith({
                                         targetId: 'edit_status_izin',
-                                        currentStatus: @js($status), // opsi di modal: pending|disetujui|ditolak
+                                        currentStatus: @js($status),
                                         nama: @js($nama === '-' ? '' : $nama),
                                         mulai: @js($mulai === '-' ? '' : $mulai),
                                         akhir: @js($akhir === '-' ? '' : $akhir)
                                     });
-                                    $wire.set('selectedIzinId', {{ $row->id }});   // pk standar
+                                    $wire.set('selectedIzinId', {{ $row->id }});
                                     $wire.set('initialStatus', @js($status));
                                     $wire.set('selectedStatus', @js($status));
                                     $wire.set('selectedNama', @js($nama === '-' ? '' : $nama));
                                     $wire.set('selectedMulai', @js($mulai === '-' ? '' : $mulai));
                                     $wire.set('selectedAkhir', @js($akhir === '-' ? '' : $akhir));
                                 ">
-                            <img src="{{ asset('images/edit_icon.svg') }}" alt=""
-                                 class="size-5 opacity-90 transition group-hover:opacity-100 group-hover:scale-110 group-hover:drop-shadow"
-                                 loading="lazy" width="20" height="20" />
-                            <span class="text-xs text-gray-700">Ubah Status</span>
+                            Edit
                         </button>
                     @endif
                 </div>
@@ -318,7 +324,7 @@
         {{ $items->onEachSide(1)->links() }}
     </div>
 
-    {{-- Modal Anda --}}
+    {{-- Modal --}}
     @include('livewire.admin.modals.bukti_pengajuan_izin')
     @include('livewire.admin.modals.edit_status_pengajuan_izin')
 </div>

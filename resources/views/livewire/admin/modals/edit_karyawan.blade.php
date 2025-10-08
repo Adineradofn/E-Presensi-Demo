@@ -13,11 +13,31 @@
      role="dialog"
      aria-modal="true"
      aria-labelledby="modalEditTitle"
-     x-on:modal-edit-open.window="open = true"
+
+     {{-- ⬇️ ini tidak diubah: masih pakai event modal-edit-open --}}
+     x-on:modal-edit-open.window="
+       open = true;
+       $nextTick(async () => {
+         try {
+           const url = await $wire.getEditCurrentPhotoUrl();
+           if (url) {
+             setPreview(url);
+             await $wire.set('removePhoto', false); // ada foto lama
+           } else {
+             resetPreview();
+             await $wire.set('removePhoto', true);  // tidak ada foto lama
+           }
+         } catch (e) {
+           resetPreview();
+           await $wire.set('removePhoto', true);
+         }
+       });
+     "
+
      x-on:modal-edit-close.window="close()"
      x-on:open-edit.window="openWith($event.detail)"
 
-     {{-- ✅ sinkron Livewire → Alpine untuk loading & progress upload --}}
+     {{-- sinkron Livewire → Alpine untuk loading & progress upload --}}
      x-on:livewire-upload-start="uploading = true; uploadProgress = 0"
      x-on:livewire-upload-finish="uploading = false; uploadProgress = 0"
      x-on:livewire-upload-error="uploading = false"
@@ -47,7 +67,6 @@
         </button>
       </div>
 
-      {{-- Kontainer yang discroll saat ada error --}}
       <div class="max-h-[70vh] overflow-y-auto px-5 py-5" data-scroll-area="edit">
         <form id="formEdit" wire:submit.prevent="update" class="grid grid-cols-1 sm:grid-cols-2 gap-4"
               novalidate enctype="multipart/form-data">
@@ -161,16 +180,33 @@
             <label class="text-sm font-medium text-gray-700">Foto (opsional)</label>
             <div class="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div class="sm:col-span-2">
-                <input type="file" name="foto" id="editFoto" x-ref="fotoInput"
-                       wire:model="edit.foto" accept=".jpg,.jpeg,.png,.webp" @change="onFotoChange"
-                       aria-invalid="{{ $errors->has('edit.foto') ? 'true' : 'false' }}"
-                       @class([
-                            'w-full rounded-xl border border-dashed bg-white/60 px-3 py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-white hover:border-emerald-300 focus:outline-none',
-                            'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500' => !$errors->has('edit.foto'),
-                            'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.foto'),
-                       ])>
+                <div class="flex items-center gap-2">
+                  <input type="file" name="foto" id="editFoto" x-ref="fotoInput"
+                         wire:model="edit.foto" accept=".jpg,.jpeg,.png,.webp" @change="onFotoChange"
+                         aria-invalid="{{ $errors->has('edit.foto') ? 'true' : 'false' }}"
+                         @class([
+                              'w-full rounded-xl border border-dashed bg-white/60 px-3 py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-white hover:border-emerald-300 focus:outline-none',
+                              'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500' => !$errors->has('edit.foto'),
+                              'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.foto'),
+                         ])>
 
-                {{-- ✅ progress upload --}}
+                  {{-- Tombol Hapus (ikon saja) --}}
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center h-10 w-10 rounded-xl border
+                           border-rose-200 text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-300"
+                    @click="removeCurrentPhoto()"
+                    title="Hapus foto"
+                    aria-label="Hapus foto"
+                  >
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <span class="sr-only">Hapus Foto</span>
+                  </button>
+                </div>
+
+                {{-- progress upload --}}
                 <div class="mt-2" x-show="uploading" x-transition>
                   <div class="h-2 w-full rounded bg-gray-200 overflow-hidden">
                     <div class="h-2 bg-emerald-500" :style="`width:${uploadProgress}%;`"></div>
@@ -181,14 +217,14 @@
                 </div>
 
                 <p class="mt-1 text-xs text-gray-500">
-                  Maks 2 MB • JPG/PNG/WebP. Tidak memilih file = tetap pakai foto lama.
+                  Maks 2 MB • JPG/PNG/WebP. Jika <strong>preview kosong</strong> saat disimpan, foto akan <strong>dihapus</strong>.
                 </p>
                 @error('edit.foto')
                   <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                 @enderror
               </div>
 
-              {{-- ✅ lindungi preview dari morph/re-render Livewire --}}
+              {{-- preview --}}
               <div class="sm:col-span-1" wire:ignore>
                 <div class="aspect-square rounded-xl border border-gray-200 bg-gray-50 overflow-hidden grid place-items-center">
                   <img x-ref="fotoPreview" alt="Preview Foto" class="hidden h-full w-full object-cover" />
@@ -245,26 +281,56 @@
 function editModal() {
   return {
     open: false,
-    uploading: false,       // ✅ state untuk progress upload
-    uploadProgress: 0,      // ✅ nilai progress 0-100
+    uploading: false,
+    uploadProgress: 0,
 
+    // Biar tetap kompatibel kalau kamu juga pakai openWith(payload)
+    fotoUrlTemplate: @js(route('admin.data.karyawan.foto', ['karyawan' => 0])),
     form: { id:'', nik:'', nama:'', alamat:'', email:'', divisi:'', jabatan:'', role:'' },
 
+    buildFotoUrl(id) {
+      return this.fotoUrlTemplate.replace('/0/', `/${id}/`) + `?v=${Date.now()}`;
+    },
+
+    setPreview(url) {
+      const img = this.$refs.fotoPreview, empty = this.$refs.fotoEmpty;
+      if (!img || !empty) return;
+      if (url) {
+        img.src = url;
+        img.onerror = () => { this.setPreview(null); }; // kalau 404 → sembunyikan
+        img.classList.remove('hidden');
+        empty.classList.add('hidden');
+      } else {
+        img.src = '';
+        img.classList.add('hidden');
+        empty.classList.remove('hidden');
+      }
+    },
+
     resetPreview() {
-      const input = this.$refs.fotoInput, img = this.$refs.fotoPreview, empty = this.$refs.fotoEmpty;
+      const input = this.$refs.fotoInput;
       if (input) input.value = '';
-      if (img) { img.src = ''; img.classList.add('hidden'); }
-      if (empty) empty.classList.remove('hidden');
+      this.setPreview(null);
     },
+
     onFotoChange(e) {
-      const file = e.target.files?.[0], img = this.$refs.fotoPreview, empty = this.$refs.fotoEmpty;
-      if (!file) { this.resetPreview(); return; }
+      const file = e.target.files?.[0];
+      if (!file) {
+        this.resetPreview();
+        this.$wire.set('removePhoto', true);
+        return;
+      }
       const url = URL.createObjectURL(file);
-      img.src = url;
-      img.onload = () => URL.revokeObjectURL(url);
-      img.classList.remove('hidden');
-      empty.classList.add('hidden');
+      this.setPreview(url);
+      this.$wire.set('removePhoto', false); // ada file baru
     },
+
+    removeCurrentPhoto() {
+      this.resetPreview();
+      this.$wire.set('removePhoto', true);
+    },
+
+    // Tetap disediakan kalau kamu kadang manggil open-edit dengan payload
     openWith(p) {
       this.form.id = p?.id ?? '';
       this.form.nik = p?.nik ?? '';
@@ -274,7 +340,16 @@ function editModal() {
       this.form.divisi = p?.divisi ?? '';
       this.form.jabatan = p?.jabatan ?? '';
       this.form.role = p?.role ?? '';
-      this.resetPreview();
+
+      if (this.form.id) {
+        const url = this.buildFotoUrl(this.form.id);
+        this.setPreview(url);
+        this.$wire.set('removePhoto', false);
+      } else {
+        this.resetPreview();
+        this.$wire.set('removePhoto', true);
+      }
+
       this.open = true;
       this.$nextTick(() => {
         this.$refs.panel?.animate?.(
@@ -285,10 +360,11 @@ function editModal() {
         first?.focus?.();
       });
     },
+
     close() {
       this.open = false;
       this.resetPreview();
-      this.uploading = false;      // ✅ bersihkan state ketika modal ditutup
+      this.uploading = false;
       this.uploadProgress = 0;
       $wire.resetEditForm?.();
     }

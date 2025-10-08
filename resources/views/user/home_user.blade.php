@@ -42,7 +42,7 @@
         </a>
 
         {{-- Riwayat Absen --}}
-        <a href="{{ route('user.riwayat_absen') }}"
+        <a href="{{ route('user.riwayat_presensi') }}"
             class="group relative overflow-hidden rounded-2xl border border-amber-300 bg-gradient-to-b from-white to-amber-50/40 p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-amber-200">
             <div
                 class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[radial-gradient(ellipse_at_top,rgba(245,158,11,.14),transparent_60%)]">

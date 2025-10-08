@@ -56,8 +56,20 @@ class DataKaryawan extends Component
         'password_confirmation' => '',
     ];
 
+    /** URL foto lama untuk preview di modal edit (admin) */
+    public $editCurrentPhotoUrl = null;
+
+    /** Flag dari tombol hapus foto (admin modal) */
+    public $editRemovePhoto = false;
+
+    /** 🔁 Alias supaya kompatibel jika Blade memanggil $wire.set('removePhoto', ...) */
+    public $removePhoto = false;
+
     protected $queryString = ['q'];
 
+    // ===========================
+    // Validation
+    // ===========================
     protected function rulesCreate()
     {
         return [
@@ -134,7 +146,9 @@ class DataKaryawan extends Component
 
     public function updatingQ() { $this->resetPage(); }
 
+    // ===========================
     // Open modals
+    // ===========================
     public function openCreateModal()
     {
         $this->resetValidation();
@@ -146,8 +160,9 @@ class DataKaryawan extends Component
     {
         $this->resetValidation();
         $k = Karyawan::findOrFail($id);
+
         $this->edit = [
-            'id'     => $k->id, // ⬅️ gunakan id standar
+            'id'     => $k->id,
             'nik'    => $k->nik,
             'nama'   => $k->nama,
             'alamat' => $k->alamat,
@@ -155,8 +170,18 @@ class DataKaryawan extends Component
             'divisi' => $k->divisi,
             'jabatan'=> $k->jabatan,
             'role'   => $k->role,
-            'foto'   => null,
+            'foto'   => null, // input file kosong saat buka
         ];
+
+        // ✅ URL foto lama untuk preview awal (ADMIN boleh lihat siapa saja)
+        $this->editCurrentPhotoUrl = $k->foto
+            ? route('admin.data.karyawan.foto', ['karyawan' => $k->getKey()]) . '?v=' . now()->timestamp
+            : null;
+
+        // reset flags
+        $this->editRemovePhoto = false;
+        $this->removePhoto     = false;
+
         $this->dispatch('modal-edit-open');
     }
 
@@ -165,7 +190,7 @@ class DataKaryawan extends Component
         $this->resetValidation();
         $k = Karyawan::findOrFail($id);
         $this->password = [
-            'id' => $k->id, // ⬅️ gunakan id standar
+            'id' => $k->id,
             'nama' => $k->nama,
             'password' => '',
             'password_confirmation' => '',
@@ -173,7 +198,15 @@ class DataKaryawan extends Component
         $this->dispatch('modal-password-open');
     }
 
+    /** Dipanggil Alpine untuk ambil URL preview (admin modal) */
+    public function getEditCurrentPhotoUrl(): ?string
+    {
+        return $this->editCurrentPhotoUrl;
+    }
+
+    // ===========================
     // STORE
+    // ===========================
     public function store()
     {
         try {
@@ -188,6 +221,7 @@ class DataKaryawan extends Component
             if ($this->create['foto']) {
                 $this->create['foto'] = $this->create['foto']->store('karyawan', 'local');
             }
+
             Karyawan::create($this->create);
 
             DB::commit();
@@ -201,7 +235,9 @@ class DataKaryawan extends Component
         }
     }
 
+    // ===========================
     // UPDATE
+    // ===========================
     public function update()
     {
         $id = $this->edit['id'] ?? null;
@@ -223,16 +259,25 @@ class DataKaryawan extends Component
                 abort(403, 'Tidak boleh mengubah data milik orang lain.');
             }
 
-            // Default: pertahankan foto lama
+            // === LOGIKA FOTO (sinkron dengan preview) ===
             $newPath = $karyawan->foto;
 
-            // Jika upload foto baru → hapus lama & simpan baru
             if ($this->edit['foto']) {
+                // Upload baru → hapus lama & simpan baru
                 if ($newPath && Storage::disk('local')->exists($newPath)) {
                     Storage::disk('local')->delete($newPath);
                 }
                 $newPath = $this->edit['foto']->store('karyawan', 'local');
+                $this->editRemovePhoto = false;
+                $this->removePhoto     = false;
+            } elseif ($this->editRemovePhoto || $this->removePhoto) {
+                // Tombol Hapus ditekan / preview kosong → hapus
+                if ($newPath && Storage::disk('local')->exists($newPath)) {
+                    Storage::disk('local')->delete($newPath);
+                }
+                $newPath = null;
             }
+            // jika tidak upload & tidak remove → pertahankan $newPath (foto lama)
 
             $karyawan->update([
                 'nik'    => $this->edit['nik'],
@@ -247,9 +292,11 @@ class DataKaryawan extends Component
 
             DB::commit();
 
+            // jika admin mengupdate dirinya sendiri → bump avatar cache
             if (($auth->id ?? null) === $karyawan->id) {
-                session()->flash('pf_ver', now()->timestamp);
-                $this->dispatch('profile-photo-updated', version: now()->timestamp);
+                $ver = now()->timestamp;
+                session()->flash('pf_ver', $ver);
+                $this->dispatch('profile-photo-updated', version: $ver);
             }
 
             Alert::success('Berhasil', 'Data karyawan berhasil diupdate');
@@ -262,7 +309,9 @@ class DataKaryawan extends Component
         }
     }
 
+    // ===========================
     // UPDATE PASSWORD
+    // ===========================
     public function updatePassword()
     {
         try {
@@ -291,6 +340,7 @@ class DataKaryawan extends Component
                 abort(403, 'Tidak boleh mengubah password milik orang lain.');
             }
 
+            // Pastikan model Karyawan handle hash via mutator/cast
             $karyawan->password = $this->password['password'];
             $karyawan->save();
 
@@ -305,41 +355,79 @@ class DataKaryawan extends Component
         }
     }
 
+    // ===========================
     // DELETE
-    public function destroy($id)
-    {
-        DB::beginTransaction();
-        try {
-            $auth = Auth::user();
-            if (!$auth) abort(401);
-            if ($auth->role !== 'admin') abort(403, 'Hanya admin yang boleh menghapus karyawan.');
+    // ===========================
+public function destroy($id)
+{
+    // Auth & role di luar try-catch agar tidak "tertelan"
+    $auth = Auth::user();
+    abort_if(!$auth, 401);
+    abort_if($auth->role !== 'admin', 403, 'Hanya admin yang boleh menghapus karyawan.');
 
-            $k = Karyawan::findOrFail($id);
+    $k = Karyawan::findOrFail($id);
 
-            if ($k->foto && Storage::disk('local')->exists($k->foto)) {
-                Storage::disk('local')->delete($k->foto);
-            }
-
-            $nama = $k->nama;
-            $k->delete();
-
-            DB::commit();
-
-            Alert::success('Berhasil', "Karyawan {$nama} berhasil dihapus");
-            return redirect()->route('admin.data.karyawan');
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            report($e);
-            Alert::error('Gagal', 'Karyawan gagal dihapus');
-            return redirect()->route('admin.data.karyawan');
-        }
+    // ❗Aturan: blok hapus jika punya presensi (pesan kustom)
+    if ($k->presensi()->exists()) {
+        Alert::error('Tidak dapat dihapus', 'Karyawan sudah memiliki data presensi');
+        return redirect()->route('admin.data.karyawan');
     }
 
+    DB::beginTransaction();
+    try {
+        // SIMPAN path dulu, jangan hapus sekarang
+        $fotoPath = $k->foto;
+        $nama     = $k->nama;
+
+        // Hapus row karyawan dulu (biar pasti DB sukses)
+        $k->delete();
+
+        // Jadwalkan hapus file SETELAH commit sukses
+        if ($fotoPath) {
+            DB::afterCommit(function () use ($fotoPath) {
+                try {
+                    if (Storage::disk('local')->exists($fotoPath)) {
+                        Storage::disk('local')->delete($fotoPath);
+                    }
+                } catch (\Throwable $e) {
+                    report($e); // kalau gagal hapus file, log saja
+                }
+            });
+        }
+
+        DB::commit();
+
+        Alert::success('Berhasil', "Karyawan {$nama} berhasil dihapus");
+        return redirect()->route('admin.data.karyawan');
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        report($e);
+
+        // Kalau tiba-tiba constraint (race), tetap pesan kustom
+        if ($k->presensi()->exists()) {
+            Alert::error('Tidak dapat dihapus', 'Karyawan sudah memiliki data presensi');
+        } else {
+            Alert::error('Gagal', 'Karyawan gagal dihapus');
+        }
+        return redirect()->route('admin.data.karyawan');
+    }
+}
+
+
+    // ===========================
     // Helpers
+    // ===========================
     public function resetCreateForm()   { $this->reset('create'); }
-    public function resetEditForm()     { $this->reset('edit'); }
+    public function resetEditForm()     { $this->reset('edit', 'editCurrentPhotoUrl', 'editRemovePhoto', 'removePhoto'); }
     public function resetPasswordForm() { $this->reset('password'); }
 
+    // 🔁 Sinkronisasi 2 properti alias (biar aman kalau UI pakai salah satunya)
+    public function updatedRemovePhoto($val)     { $this->editRemovePhoto = (bool) $val; }
+    public function updatedEditRemovePhoto($val) { $this->removePhoto     = (bool) $val; }
+
+    // ===========================
+    // Render
+    // ===========================
     public function render()
     {
         $q = trim($this->q);
@@ -354,13 +442,15 @@ class DataKaryawan extends Component
                     ->orWhere('jabatan', 'like', $like);
             });
         })
-        ->orderByDesc('id') // ⬅️ gunakan kolom id standar
+        ->orderByDesc('id')
         ->paginate($this->perPage);
 
         return view('livewire.admin.data-karyawan', compact('karyawans'));
     }
 
-    // Self edit/password
+    // ===========================
+    // (Opsional) Self edit/password lewat modal yang sama
+    // ===========================
     public function openSelfEdit()
     {
         $this->resetValidation();
@@ -368,7 +458,7 @@ class DataKaryawan extends Component
         abort_unless($me, 403);
 
         $this->edit = [
-            'id'     => $me->id, // ⬅️ id standar
+            'id'     => $me->id,
             'nik'    => $me->nik,
             'nama'   => $me->nama,
             'alamat' => $me->alamat,
@@ -378,6 +468,14 @@ class DataKaryawan extends Component
             'role'   => $me->role,
             'foto'   => null,
         ];
+
+        // Self: hanya pemilik yang boleh akses
+        $this->editCurrentPhotoUrl = $me->foto
+            ? route('data.karyawan.foto', ['karyawan' => $me->getKey()]) . '?v=' . now()->timestamp
+            : null;
+
+        $this->editRemovePhoto = false;
+        $this->removePhoto     = false;
 
         $this->dispatch('modal-edit-open');
     }
@@ -389,7 +487,7 @@ class DataKaryawan extends Component
         abort_unless($me, 403);
 
         $this->password = [
-            'id' => $me->id, // ⬅️ id standar
+            'id' => $me->id,
             'nama' => $me->nama,
             'password' => '',
             'password_confirmation' => '',

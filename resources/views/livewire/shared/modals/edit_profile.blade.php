@@ -15,7 +15,6 @@
     window.addEventListener('self-profile:edit-close', () => close());
   "
 
-  {{-- ✅ sinkron state upload Livewire → Alpine --}}
   x-on:livewire-upload-start="uploading = true; uploadProgress = 0"
   x-on:livewire-upload-finish="uploading = false; uploadProgress = 0"
   x-on:livewire-upload-error="uploading = false"
@@ -57,27 +56,8 @@
             <span>Kolom bertanda <span class="text-red-600">*</span> wajib diisi.</span>
           </div>
 
-          {{-- NIK --}}
-          <div class="sm:col-span-1">
-            <label class="text-sm font-medium text-gray-700">NIK <span class="text-red-600">*</span></label>
-            <div class="relative mt-1">
-              <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <svg class="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                  <path d="M3 5h18M3 12h18M3 19h18" stroke-width="2" stroke-linecap="round" />
-                </svg>
-              </span>
-              <input type="text" name="nik" wire:model.defer="edit.nik" placeholder="Masukkan NIK"
-                     @class([
-                       'w-full rounded-xl border bg-white/80 px-3 py-2 pl-10 focus:outline-none',
-                       'focus:ring-emerald-500 focus:border-emerald-500 border-gray-300' => !$errors->has('edit.nik'),
-                       'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.nik'),
-                     ])>
-            </div>
-            @error('edit.nik') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-          </div>
-
           {{-- Nama --}}
-          <div class="sm:col-span-1 sm:col-start-2">
+          <div class="sm:col-span-1">
             <label class="text-sm font-medium text-gray-700">Nama <span class="text-red-600">*</span></label>
             <input type="text" name="nama" wire:model.defer="edit.nama" placeholder="Nama lengkap"
                    @class([
@@ -86,18 +66,6 @@
                      'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.nama'),
                    ])>
             @error('edit.nama') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-          {{-- Alamat --}}
-          <div class="sm:col-span-2">
-            <label class="text-sm font-medium text-gray-700">Alamat <span class="text-red-600">*</span></label>
-            <input type="text" name="alamat" wire:model.defer="edit.alamat" placeholder="Jl. Contoh No. 123, Kota"
-                   @class([
-                     'mt-1 w-full rounded-xl border bg-white/80 px-3 py-2 focus:outline-none',
-                     'focus:ring-emerald-500 focus:border-emerald-500 border-gray-300' => !$errors->has('edit.alamat'),
-                     'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.alamat'),
-                   ])>
-            @error('edit.alamat') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
           </div>
 
           {{-- Email --}}
@@ -120,50 +88,55 @@
             @error('edit.email') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
           </div>
 
-          {{-- Divisi --}}
-          <div class="sm:col-span-1 sm:col-start-2">
-            <label class="text-sm font-medium text-gray-700">Divisi <span class="text-red-600">*</span></label>
-            <input type="text" name="divisi" wire:model.defer="edit.divisi" placeholder="Mis. Operasional"
-                   @class([
-                     'mt-1 w-full rounded-xl border bg-white/80 px-3 py-2 focus:outline-none',
-                     'focus:ring-emerald-500 focus:border-emerald-500 border-gray-300' => !$errors->has('edit.divisi'),
-                     'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.divisi'),
-                   ])>
-            @error('edit.divisi') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-          {{-- Jabatan --}}
-          <div class="sm:col-span-1">
-            <label class="text-sm font-medium text-gray-700">Jabatan <span class="text-red-600">*</span></label>
-            <input type="text" name="jabatan" wire:model.defer="edit.jabatan" placeholder="Mis. Supervisor"
-                   @class([
-                     'mt-1 w-full rounded-xl border bg-white/80 px-3 py-2 focus:outline-none',
-                     'focus:ring-emerald-500 focus:border-emerald-500 border-gray-300' => !$errors->has('edit.jabatan'),
-                     'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.jabatan'),
-                   ])>
-            @error('edit.jabatan') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-          {{-- Foto --}}
+          {{-- Alamat --}}
           <div class="sm:col-span-2">
-            <label class="text-sm font-medium text-gray-700">Foto (opsional, ganti)</label>
+            <label class="text-sm font-medium text-gray-700">Alamat <span class="text-red-600">*</span></label>
+            <input type="text" name="alamat" wire:model.defer="edit.alamat" placeholder="Jl. Contoh No. 123, Kota"
+                   @class([
+                     'mt-1 w-full rounded-xl border bg-white/80 px-3 py-2 focus:outline-none',
+                     'focus:ring-emerald-500 focus:border-emerald-500 border-gray-300' => !$errors->has('edit.alamat'),
+                     'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.alamat'),
+                   ])>
+            @error('edit.alamat') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+          </div>
+
+          {{-- Foto (opsional) --}}
+          <div class="sm:col-span-2">
+            <label class="text-sm font-medium text-gray-700">Foto (opsional)</label>
             <div class="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div class="sm:col-span-2">
-                <input
-                  type="file"
-                  name="foto"
-                  id="selfEditFoto"
-                  x-ref="fotoInput"
-                  wire:model="edit.foto"
-                  accept=".jpg,.jpeg,.png,.webp"
-                  @change="onFotoChange"
-                  @class([
-                    'w-full rounded-xl border border-dashed bg-white/60 px-3 py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-white hover:border-emerald-300 focus:outline-none',
-                    'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500' => !$errors->has('edit.foto'),
-                    'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.foto'),
-                  ])>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="file"
+                    name="foto"
+                    id="selfEditFoto"
+                    x-ref="fotoInput"
+                    wire:model="edit.foto"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    @change="onFotoChange"
+                    @class([
+                      'w-full rounded-xl border border-dashed bg-white/60 px-3 py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-white hover:border-emerald-300 focus:outline-none',
+                      'border-gray-300 focus:ring-emerald-500 focus:border-emerald-500' => !$errors->has('edit.foto'),
+                      'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.foto'),
+                    ])>
 
-                {{-- ✅ progress upload --}}
+                  {{-- Tombol Hapus Foto (ikon saja) --}}
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center h-10 w-10 rounded-xl border
+                           border-rose-200 text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-300"
+                    @click="removeCurrentPhoto()"
+                    title="Hapus foto"
+                    aria-label="Hapus foto"
+                  >
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <span class="sr-only">Hapus Foto</span>
+                  </button>
+                </div>
+
+                {{-- progress upload --}}
                 <div class="mt-2" x-show="uploading" x-transition>
                   <div class="h-2 w-full rounded bg-gray-200 overflow-hidden">
                     <div class="h-2 bg-emerald-500" :style="`width:${uploadProgress}%;`"></div>
@@ -172,12 +145,12 @@
                 </div>
 
                 <p class="mt-1 text-xs text-gray-500">
-                  Kosongkan untuk <strong>menghapus</strong> foto lama.
+                  Jika <strong>preview kosong</strong> saat disimpan, maka foto Anda akan <strong>dihapus</strong>.
                 </p>
                 @error('edit.foto') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
               </div>
 
-              {{-- ✅ lindungi preview dari morphing Livewire --}}
+              {{-- preview (wire:ignore agar tidak ke-reinit oleh Livewire morph) --}}
               <div class="sm:col-span-1" wire:ignore>
                 <div class="aspect-square rounded-xl border border-gray-200 bg-gray-50 overflow-hidden grid place-items-center">
                   <img x-ref="fotoPreview" alt="Preview Foto" class="hidden h-full w-full object-cover" />
@@ -197,7 +170,7 @@
                 class="px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
                 wire:loading.attr="disabled"
                 wire:target="updateSelf,edit.foto"
-                :disabled="uploading"  {{-- ✅ cegah submit saat upload berlangsung --}}
+                :disabled="uploading"
               >
                 <span wire:loading.remove wire:target="updateSelf,edit.foto">Update</span>
                 <span wire:loading wire:target="updateSelf,edit.foto">Memproses…</span>
@@ -219,22 +192,60 @@ function selfEditModal() {
     uploading: false,
     uploadProgress: 0,
 
+    setPreview(url) {
+      const img = this.$refs.fotoPreview, empty = this.$refs.fotoEmpty;
+      if (!img || !empty) return;
+      if (url) {
+        img.src = url;
+        img.onload = () => { try { URL.revokeObjectURL(url); } catch(e) {} };
+        img.classList.remove('hidden');
+        empty.classList.add('hidden');
+      } else {
+        img.src = '';
+        img.classList.add('hidden');
+        empty.classList.remove('hidden');
+      }
+    },
+
     resetPreview() {
-      const input = this.$refs.fotoInput, img = this.$refs.fotoPreview, empty = this.$refs.fotoEmpty;
+      const input = this.$refs.fotoInput;
       if (input) input.value = '';
-      if (img) { img.src = ''; img.classList.add('hidden'); }
-      if (empty) empty.classList.remove('hidden');
+      this.setPreview(null);
     },
+
     onFotoChange(e) {
-      const file = e.target.files?.[0], img = this.$refs.fotoPreview, empty = this.$refs.fotoEmpty;
-      if (!file) { this.resetPreview(); return; }
+      const file = e.target.files?.[0];
+      if (!file) {
+        this.resetPreview();
+        this.$wire.set('removePhoto', true);
+        return;
+      }
       const url = URL.createObjectURL(file);
-      img.src = url; img.onload = () => URL.revokeObjectURL(url);
-      img.classList.remove('hidden'); empty.classList.add('hidden');
+      this.setPreview(url);
+      this.$wire.set('removePhoto', false); // ada file baru => jangan hapus
     },
+
+    async removeCurrentPhoto() {
+      this.resetPreview();
+      await this.$wire.set('removePhoto', true);
+    },
+
     async openFromAuth() {
       await this.$wire.fillFromAuth();
-      this.resetPreview();
+
+      try {
+        const url = await this.$wire.getCurrentPhotoUrl();
+        if (url) {
+          this.setPreview(url);
+          await this.$wire.set('removePhoto', false);
+        } else {
+          this.resetPreview();
+          await this.$wire.set('removePhoto', true);
+        }
+      } catch (_) {
+        this.resetPreview();
+      }
+
       this.open = true;
       this.$nextTick(() => {
         this.$refs.panel?.animate?.(
@@ -244,7 +255,12 @@ function selfEditModal() {
         document.querySelector('#formSelfEdit input, #formSelfEdit select')?.focus?.();
       });
     },
-    close() { this.open = false; this.resetPreview(); this.$wire.resetEditForm?.(); }
+
+    close() {
+      this.open = false;
+      this.resetPreview();
+      this.$wire.resetEditForm?.();
+    }
   }
 }
 </script>

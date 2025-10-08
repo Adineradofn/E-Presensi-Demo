@@ -61,10 +61,10 @@
         <span>Pengajuan Izin</span>
       </a>
 
-      <a href="{{ route('user.riwayat_absen') }}"
+      <a href="{{ route('user.riwayat_presensi') }}"
          wire:navigate.hover
          wire:current="{{ $active }}"
-         class="{{ $baseLink }} {{ $hover }} {{ request()->routeIs('user.riwayat_absen*') ? $active : $normal }}">
+         class="{{ $baseLink }} {{ $hover }} {{ request()->routeIs('user.riwayat_presensi*') ? $active : $normal }}">
         <img src="{{ asset('images/riwayat_presensi_icon.svg') }}" class="h-5 w-5" alt="Riwayat Presensi" loading="lazy">
         <span>Riwayat Presensi</span>
       </a>
@@ -150,11 +150,11 @@
         <span>Pengajuan Izin</span>
       </a>
 
-      <a href="{{ route('user.riwayat_absen') }}"
+      <a href="{{ route('user.riwayat_presensi') }}"
          wire:navigate.hover
          wire:current="{{ $active }}"
          @click="open = false"
-         class="{{ $baseLink }} {{ $hover }} {{ request()->routeIs('user.riwayat_absen*') ? $active : $normal }}">
+         class="{{ $baseLink }} {{ $hover }} {{ request()->routeIs('user.riwayat_presensi*') ? $active : $normal }}">
         <img src="{{ asset('images/riwayat_presensi_icon.svg') }}" class="h-5 w-5" alt="Riwayat Presensi" loading="lazy">
         <span>Riwayat Presensi</span>
       </a>

@@ -13,8 +13,8 @@ use App\Livewire\Admin\DataKaryawan;
 use App\Livewire\Admin\DataPresensi;
 use App\Livewire\Admin\DataPengajuanIzin;
 use App\Livewire\Admin\RekapPresensi;
+use App\Livewire\Admin\DataHariLibur;
 use App\Http\Controllers\Admin\RekapPresensiExportController;
-
 
 Route::get('/', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
@@ -34,7 +34,7 @@ Route::middleware(['auth', 'role:admin'])
 
         Route::get('/data-karyawan', DataKaryawan::class)->name('data.karyawan');
 
-        Route::get('/data-karyawan/{karyawan}/foto', [FotoKaryawanController::class, 'photo'])
+        Route::get('/data-karyawan/{karyawan}/foto', [FotoKaryawanController::class, 'photoAdmin'])
             ->whereNumber('karyawan')
             ->name('data.karyawan.foto');
 
@@ -57,12 +57,13 @@ Route::middleware(['auth', 'role:admin'])
         // routes/web.php (di grup admin)
         Route::get('/rekap-presensi', \App\Livewire\Admin\RekapPresensi::class)->name('data.rekap-presensi');
         Route::get('/rekap-presensi/export', RekapPresensiExportController::class)->name('rekap-presensi.export');
+        Route::get('/hari-libur', DataHariLibur::class)->name('hari-libur');
     });
 
 Route::middleware(['auth', 'role:admin,karyawan'])->group(function () {
     Route::get('/home', fn() => view('user.home_user', ['title' => 'Home']))->name('user.home');
 
-    Route::get('/data-karyawan/{karyawan}/foto', [FotoKaryawanController::class, 'photo'])
+     Route::get('/data-karyawan/{karyawan}/foto', [FotoKaryawanController::class, 'photoSelf'])
         ->whereNumber('karyawan')
         ->name('data.karyawan.foto');
 
@@ -80,6 +81,6 @@ Route::middleware(['auth', 'role:admin,karyawan'])->group(function () {
     Route::get('/izin/bukti/{izin}', [IzinController::class, 'showBukti'])->name('user.izin.bukti.show');
 
     // Riwayat
-    Route::get('/riwayat-absen', [RiwayatPresensiController::class, 'index'])->name('user.riwayat_absen');
+    Route::get('/riwayat-presensi', [RiwayatPresensiController::class, 'index'])->name('user.riwayat_presensi');
     Route::get('/riwayat-izin', [IzinController::class, 'history'])->name('user.riwayat_izin');
 });

@@ -1,6 +1,6 @@
+{{-- resources/views/livewire/admin/data-presensi.blade.php --}}
 <div x-data>
     @php
-        use Illuminate\Support\Facades\Storage;
         $mode = $mode ?? 'hari';
     @endphp
 
@@ -123,23 +123,22 @@
                     <tbody class="divide-y divide-gray-100">
                         @forelse($items as $row)
                             @php
-                                $nama = $row->karyawan->nama ?? '-';
+                                $nama   = $row->karyawan->nama ?? '-';
                                 $divisi = $row->karyawan->divisi ?? '-';
-                                $jabatan = $row->karyawan->jabatan ?? '-';
-                                $nik = $row->karyawan->nik ?? '-';
-                                $jm = $row->jam_masuk ? $row->jam_masuk->format('H:i') : '-';
-                                $jp = $row->jam_pulang ? $row->jam_pulang->format('H:i') : '-';
-                                $tgl = $row->tanggal ? $row->tanggal->format('Y-m-d') : '-';
+                                $jabatan= $row->karyawan->jabatan ?? '-';
+                                $nik    = $row->karyawan->nik ?? '-';
+                                $jm     = $row->jam_masuk ? $row->jam_masuk->format('H:i') : '-';
+                                $jp     = $row->jam_pulang ? $row->jam_pulang->format('H:i') : '-';
+                                $tgl    = $row->tanggal ? $row->tanggal->format('Y-m-d') : '-';
                                 $status = $row->status_presensi;
 
-                                $badgeClass = match ($status) {
-                                    'hadir' => 'bg-emerald-100 text-emerald-700',
-                                    'izin'  => 'bg-sky-100 text-sky-700',
-                                    'sakit' => 'bg-violet-100 text-violet-700',
-                                    'alpa'  => 'bg-amber-100 text-amber-700',
-                                    'invalid' => 'bg-red-100 text-red-700',
-                                    'cuti'  => 'bg-gray-100 text-gray-700',
-                                    default => 'bg-gray-100 text-gray-700',
+                                // Warna badge yang estetis (Tailwind)
+                                $badgeClass = match (strtolower((string) $status)) {
+                                    'hadir'                 => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
+                                    'alpa'                  => 'bg-red-100 text-red-700 ring-1 ring-red-200',
+                                    'izin', 'cuti', 'sakit' => 'bg-amber-100 text-amber-700 ring-1 ring-amber-200',
+                                    'invalid'               => 'bg-red-100 text-red-700 ring-1 ring-red-200',
+                                    default                 => 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
                                 };
 
                                 $hasMasuk = filled($row->foto_masuk);
@@ -198,23 +197,22 @@
         <div class="sm:hidden space-y-3 mt-2">
             @forelse($items as $row)
                 @php
-                    $nama = $row->karyawan->nama ?? '-';
+                    $nama   = $row->karyawan->nama ?? '-';
                     $divisi = $row->karyawan->divisi ?? '-';
-                    $jabatan = $row->karyawan->jabatan ?? '-';
-                    $nik = $row->karyawan->nik ?? '-';
-                    $jm = $row->jam_masuk ? $row->jam_masuk->format('H:i') : '-';
-                    $jp = $row->jam_pulang ? $row->jam_pulang->format('H:i') : '-';
-                    $tgl = $row->tanggal ? $row->tanggal->format('Y-m-d') : '-';
+                    $jabatan= $row->karyawan->jabatan ?? '-';
+                    $nik    = $row->karyawan->nik ?? '-';
+                    $jm     = $row->jam_masuk ? $row->jam_masuk->format('H:i') : '-';
+                    $jp     = $row->jam_pulang ? $row->jam_pulang->format('H:i') : '-';
+                    $tgl    = $row->tanggal ? $row->tanggal->format('Y-m-d') : '-';
                     $status = $row->status_presensi;
 
-                    $badgeClass = match ($status) {
-                        'hadir' => 'bg-emerald-100 text-emerald-700',
-                        'izin'  => 'bg-sky-100 text-sky-700',
-                        'sakit' => 'bg-violet-100 text-violet-700',
-                        'alpa'  => 'bg-amber-100 text-amber-700',
-                        'invalid' => 'bg-red-100 text-red-700',
-                        'cuti'  => 'bg-gray-100 text-gray-700',
-                        default => 'bg-gray-100 text-gray-700',
+                    // Konsisten dengan tabel desktop
+                    $badgeClass = match (strtolower((string) $status)) {
+                        'hadir'                 => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
+                        'alpa'                  => 'bg-red-100 text-red-700 ring-1 ring-red-200',
+                        'izin', 'cuti', 'sakit' => 'bg-amber-100 text-amber-700 ring-1 ring-amber-200',
+                        'invalid'               => 'bg-red-100 text-red-700 ring-1 ring-red-200',
+                        default                 => 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
                     };
 
                     $hasMasuk = filled($row->foto_masuk);

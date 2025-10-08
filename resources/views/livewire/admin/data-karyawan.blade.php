@@ -126,7 +126,7 @@
                             <button type="button"
                                 class="col-span-1 inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-600 bg-white px-2 py-1.5 text-[12px] font-medium text-emerald-700 hover:bg-emerald-50 active:scale-[.98] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 touch-manipulation"
                                 @click="$dispatch('modal-edit-open'); $wire.openEditModal({{ $k->id }})"
-                                aria-label="Ubah Data {{ $k->nama }}">
+                                aria-label="Edit Data {{ $k->nama }}">
                                 <img src="{{ asset('images/edit_dropdown_icon.svg') }}" class="h-4 w-4" alt="edit">
                                 <span class="whitespace-nowrap">Ubah</span>
                             </button>
@@ -135,7 +135,7 @@
                             <button type="button"
                                 class="col-span-1 inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-amber-500 bg-amber-50 px-2 py-1.5 text-[12px] font-medium text-amber-800 hover:bg-amber-100 active:scale-[.98] focus:outline-none focus:ring-2 focus:ring-amber-500/50 touch-manipulation"
                                 @click="$dispatch('modal-password-open'); $wire.openPasswordModal({{ $k->id }})"
-                                aria-label="Ubah Password {{ $k->nama }}">
+                                aria-label="Edit Password {{ $k->nama }}">
                                 <img src="{{ asset('images/password_dropdown_icon.svg') }}" class="h-4 w-4" alt="pwd">
                                 <span class="whitespace-nowrap">Password</span>
                             </button>
@@ -188,13 +188,13 @@
                                     <button type="button"
                                         class="px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-sm"
                                         @click="$dispatch('modal-edit-open'); $wire.openEditModal({{ $k->id }})">
-                                        Ubah Data
+                                        Edit Data
                                     </button>
 
                                     <button type="button"
                                         class="px-3 py-1.5 rounded-lg border border-amber-600 text-amber-700 hover:bg-amber-50 text-sm"
                                         @click="$dispatch('modal-password-open'); $wire.openPasswordModal({{ $k->id }})">
-                                        Ubah Password
+                                        Edit Password
                                     </button>
 
                                     <button type="button"

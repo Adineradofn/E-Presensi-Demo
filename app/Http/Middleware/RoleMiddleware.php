@@ -14,35 +14,33 @@ class RoleMiddleware
      *   ->middleware('role:admin,karyawan')
      */
     public function handle(Request $request, Closure $next, ...$roles)
-    {
-        // Jika belum login → arahkan ke halaman login
-        if (!Auth::check()) {
-            return redirect()->route('login');
-        }
-
-        // $roles berisi daftar role yang diizinkan, mis. ['admin'] atau ['admin','karyawan']
-        // Trim setiap entri untuk menghindari spasi yang tak sengaja
-        $allowed = array_map('trim', $roles);
-
-        // Cek apakah role user saat ini termasuk yang diizinkan (perbandingan ketat/type-strict)
-        if (!in_array((string) Auth::user()->role, $allowed, true)) {
-            // Tentukan halaman fallback berdasarkan role user saat ini
-            // Catatan: jika role tidak 'admin', default diarahkan ke 'user.home'
-            $redirect = Auth::user()->role === 'admin' ? 'admin.mode' : 'user.home';
-
-            // Pengaman: hindari loop redirect jika pengguna sudah berada di route tujuan
-            if ($request->routeIs($redirect)) {
-                // Alternatif: bisa abort(403) jika ingin menolak akses tanpa redirect
-                return redirect()->route('login')
-                    ->withErrors(['auth' => 'Anda tidak punya akses ke halaman ini.']);
-            }
-
-            // Redirect ke halaman fallback + kirim pesan error global
-            return redirect()->route($redirect)
-                ->withErrors(['auth' => 'Anda tidak punya akses ke halaman ini']);
-        }
-
-        // Lolos pengecekan role → lanjut proses request
-        return $next($request);
+{
+    if (!Auth::check()) {
+        return redirect()->route('login');
     }
+
+    // Normalisasi jadi lowercase & trim
+    $allowed = array_map(fn ($r) => strtolower(trim($r)), $roles);
+    $current = strtolower((string) Auth::user()->role);
+
+    if (!in_array($current, $allowed, true)) {
+        // Tentukan halaman fallback per role
+        $redirect = match ($current) {
+            'superadmin' => 'superadmin.dashboard',   // atur sesuai route yang Anda buat
+            'admin'      => 'admin.mode',             // sudah ada di routes Anda
+            default      => 'user.home',              // user
+        };
+
+        if ($request->routeIs($redirect)) {
+            return redirect()->route('login')
+                ->withErrors(['auth' => 'Anda tidak punya akses ke halaman ini.']);
+        }
+
+        return redirect()->route($redirect)
+            ->withErrors(['auth' => 'Anda tidak punya akses ke halaman ini']);
+    }
+
+    return $next($request);
+}
+
 }
