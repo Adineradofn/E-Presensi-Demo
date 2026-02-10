@@ -1,13 +1,18 @@
 {
     "version": 2,
-    "framework": null,
-    "functions": {
-       "api/*.php": { "runtime": "vercel-php@0.7.4" }
-    },
+    "builds": [
+        {
+            "src": "api/index.php",
+            "use": "vercel-php@0.7.4"
+        },
+        {
+            "src": "public/**",
+            "use": "@vercel/static"
+        }
+    ],
     "routes": [
         {
-            "src": "/(build|css|js|assets|storage)/(.*)",
-            "dest": "/$1/$2"
+            "handle": "filesystem"
         },
         {
             "src": "/(.*)",
@@ -26,6 +31,5 @@
         "VIEW_COMPILED_PATH": "/tmp",
         "SESSION_DRIVER": "cookie",
         "LOG_CHANNEL": "stderr"
-    },
-    "outputDirectory": "public" 
+    }
 }
