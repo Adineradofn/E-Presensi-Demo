@@ -39,10 +39,29 @@ return [
                 if (isset($_SERVER['VERCEL']) || isset($_ENV['VERCEL'])) {
                     $source = database_path('database.sqlite');
                     $destination = '/tmp/database.sqlite';
+                    
                     // Always copy to ensure fresh database on each invocation
                     if (file_exists($source)) {
                         @copy($source, $destination);
                     }
+                    
+                    // Check if database is empty (no tables) and initialize if needed
+                    try {
+                        $pdo = new PDO('sqlite:' . $destination);
+                        $result = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='karyawan'")->fetch();
+                        
+                        if (!$result) {
+                            // Database empty, try to initialize from SQL dump
+                            $sqlDump = database_path('schema.sql');
+                            if (file_exists($sqlDump)) {
+                                $sql = file_get_contents($sqlDump);
+                                $pdo->exec($sql);
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // Ignore errors, let Laravel handle
+                    }
+                    
                     return $destination;
                 }
                 return env('DB_DATABASE', database_path('database.sqlite'));
