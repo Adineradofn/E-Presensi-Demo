@@ -29,14 +29,5 @@
         "SESSION_DRIVER": "cookie",
         "LOG_CHANNEL": "stderr"
     },
-    "builds": [
-        {
-            "src": "api/index.php",
-            "use": "vercel-php@0.6.0"
-        },
-        {
-            "src": "public/**/*",
-            "use": "@vercel/static"
-        }
-    ]
+    "outputDirectory": "public" 
 }
