@@ -39,8 +39,9 @@ return [
                 if (isset($_SERVER['VERCEL']) || isset($_ENV['VERCEL'])) {
                     $source = database_path('database.sqlite');
                     $destination = '/tmp/database.sqlite';
-                    if (!file_exists($destination) && file_exists($source)) {
-                        copy($source, $destination);
+                    // Always copy to ensure fresh database on each invocation
+                    if (file_exists($source)) {
+                        @copy($source, $destination);
                     }
                     return $destination;
                 }
