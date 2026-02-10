@@ -51,7 +51,7 @@
                 <div>
                     <h1 class="text-xl font-semibold">Pengajuan Izin</h1>
                     <p class="text-sm text-gray-500 mt-1">
-                        Ajukan izin/sakit/cuti atau izin terlambat/tugas. Bukti (foto/PDF) dapat dilampirkan bila perlu.
+                        Ajukan izin/sakit/cuti atau izin terlambat/tugas. <b>Bukti (foto/PDF) wajib dilampirkan.</b>
                     </p>
                 </div>
             </div>
@@ -61,7 +61,7 @@
                   class="p-5 space-y-4">
                 @csrf
 
-                {{-- Jenis Izin (PERBAIKAN: ejaan & pilihan lengkap) --}}
+                {{-- Jenis Izin --}}
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Jenis Izin <span class="text-red-500">*</span>
@@ -75,18 +75,18 @@
                             required
                         >
                             <option value="">— pilih —</option>
-                            <option value="izin">Izin</option>
-                            <option value="sakit">Sakit</option>
-                            <option value="cuti">Cuti</option>
-                            <option value="izin terlambat">Izin Terlambat (1 hari)</option>
-                            <option value="tugas">Tugas</option>
+                            <option value="izin" @selected(old('jenis')==='izin')>Izin</option>
+                            <option value="sakit" @selected(old('jenis')==='sakit')>Sakit</option>
+                            <option value="cuti" @selected(old('jenis')==='cuti')>Cuti</option>
+                            <option value="izin terlambat" @selected(old('jenis')==='izin terlambat')>Izin Terlambat (1 hari)</option>
+                            <option value="tugas" @selected(old('jenis')==='tugas')>Tugas</option>
                         </select>
                     </div>
                     @error('jenis')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
 
-                    {{-- Hint singkat sesuai kebijakan (informasi, tidak mengubah desain) --}}
+                    {{-- Hint singkat sesuai kebijakan --}}
                     <ul class="mt-2 text-[12px] text-gray-500 list-disc list-inside space-y-1">
                         <li x-show="jenis==='izin terlambat'">Izin terlambat dibatasi <b>1 hari</b>. Sistem akan mengunci tanggal selesai = tanggal mulai.</li>
                         <li x-show="jenis==='tugas'">Saat <b>tugas disetujui</b>, presensi diblokir dan status kehadiran dianggap hadir.</li>
@@ -143,7 +143,7 @@
                         </p>
                         @error('tanggal_selesai')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                        @enderror>
+                        @enderror
                     </div>
                 </div>
 
@@ -168,10 +168,7 @@
                     @enderror
                 </div>
 
-                {{-- Bukti (foto / PDF) + Preview 
-                     Catatan: tidak di-"required" di front-end (opsional), 
-                     back-end juga sudah mengizinkan opsional. 
-                     Untuk izin/sakit/cuti biasanya melampirkan bukti sangat dianjurkan. --}}
+                {{-- Bukti (foto / PDF) + Preview - Wajib --}}
                 <div x-on:dragover.prevent x-on:drop.prevent="handleDrop($event)" class="group">
                     <input 
                         id="bukti" 
@@ -181,6 +178,7 @@
                         class="hidden"
                         x-ref="file" 
                         x-on:change="onFileChange"
+                        required
                     >
                     <label for="bukti"
                         class="block rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 hover:border-emerald-300 transition cursor-pointer">

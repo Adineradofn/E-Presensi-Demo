@@ -1,5 +1,5 @@
-{{-- resources/views/livewire/admin/data-karyawan.blade.php --}}
 <div
+    id="admin-data-karyawan-root"
     x-data="{
         async confirmDelete(id, name) {
             const res = await Swal.fire({
@@ -22,8 +22,19 @@
         window.dispatchEvent(new CustomEvent('modal-create-close'));
         window.dispatchEvent(new CustomEvent('modal-edit-close'));
         window.dispatchEvent(new CustomEvent('modal-password-close'));
+        window.dispatchEvent(new CustomEvent('global-loader-hide'));  {{-- pastikan loader tertutup --}}
+        $wire.resetCreateForm();
+        $wire.resetEditForm();
+        $wire.resetPasswordForm();
     "
 >
+    @once
+    <style>[x-cloak]{display:none!important}</style>
+    @endonce
+
+    {{-- loader global --}}
+    @include('partials.global-loader')
+
     <div class="p-4">
         <h2 class="text-xl sm:text-2xl font-bold mb-4">Data Karyawan</h2>
 
@@ -31,7 +42,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
             <button type="button"
                 class="w-full sm:w-auto inline-flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg shadow-sm"
-                @click="$dispatch('modal-create-open'); $wire.openCreateModal()">
+                @click="$dispatch('modal-create-open')">
                 Tambah Karyawan
             </button>
 
@@ -109,6 +120,12 @@
                             <dt class="text-gray-500">NIK</dt>
                             <dd class="font-medium text-gray-900 tracking-tight">{{ $k->nik }}</dd>
                         </div>
+
+                        <div>
+                            <dt class="text-gray-500">Jenis Kelamin</dt>
+                            <dd class="text-gray-900">{{ $k->jenis_kelamin }}</dd>
+                        </div>
+
                         <div>
                             <dt class="text-gray-500">Divisi</dt>
                             <dd class="text-gray-900">{{ $k->divisi }}</dd>
@@ -122,19 +139,35 @@
                     {{-- Aksi (Mobile) --}}
                     <div class="mt-4">
                         <div class="grid grid-cols-3 gap-2">
-                            {{-- Ubah --}}
+                            {{-- Ubah (dengan loader global) --}}
                             <button type="button"
                                 class="col-span-1 inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-600 bg-white px-2 py-1.5 text-[12px] font-medium text-emerald-700 hover:bg-emerald-50 active:scale-[.98] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 touch-manipulation"
-                                @click="$dispatch('modal-edit-open'); $wire.openEditModal({{ $k->id }})"
+                                @click="(async () => {
+                                    window.dispatchEvent(new CustomEvent('global-loader-show'));
+                                    try {
+                                      const ok = await $wire.openEditModal({{ $k->id }});
+                                      if (ok) { $dispatch('modal-edit-open'); }
+                                    } finally {
+                                      window.dispatchEvent(new CustomEvent('global-loader-hide'));
+                                    }
+                                  })()"
                                 aria-label="Edit Data {{ $k->nama }}">
                                 <img src="{{ asset('images/edit_dropdown_icon.svg') }}" class="h-4 w-4" alt="edit">
                                 <span class="whitespace-nowrap">Ubah</span>
                             </button>
 
-                            {{-- Password --}}
+                            {{-- Password (dengan loader global, pola sama seperti Edit Data) --}}
                             <button type="button"
                                 class="col-span-1 inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-amber-500 bg-amber-50 px-2 py-1.5 text-[12px] font-medium text-amber-800 hover:bg-amber-100 active:scale-[.98] focus:outline-none focus:ring-2 focus:ring-amber-500/50 touch-manipulation"
-                                @click="$dispatch('modal-password-open'); $wire.openPasswordModal({{ $k->id }})"
+                                @click="(async () => {
+                                    window.dispatchEvent(new CustomEvent('global-loader-show'));
+                                    try {
+                                      const ok = await $wire.openPasswordModal({{ $k->id }});
+                                      if (ok) { $dispatch('modal-password-open'); }
+                                    } finally {
+                                      window.dispatchEvent(new CustomEvent('global-loader-hide'));
+                                    }
+                                  })()"
                                 aria-label="Edit Password {{ $k->nama }}">
                                 <img src="{{ asset('images/password_dropdown_icon.svg') }}" class="h-4 w-4" alt="pwd">
                                 <span class="whitespace-nowrap">Password</span>
@@ -161,10 +194,11 @@
         {{-- ====== DESKTOP (TABLE) ====== --}}
         <div class="hidden md:block overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
             <table class="min-w-full">
-                <thead class="bg-gray-50 text-left text-gray-700">
+                <thead class="bg-gray-200 text-left text-gray-700">
                     <tr>
                         <th class="px-4 py-3 text-sm font-semibold">NIK</th>
                         <th class="px-4 py-3 text-sm font-semibold">Nama</th>
+                        <th class="px-4 py-3 text-sm font-semibold">Jenis Kelamin</th>
                         <th class="px-4 py-3 text-sm font-semibold">Email</th>
                         <th class="px-4 py-3 text-sm font-semibold">Divisi</th>
                         <th class="px-4 py-3 text-sm font-semibold">Jabatan</th>
@@ -177,6 +211,7 @@
                         <tr class="hover:bg-gray-50" wire:key="row-{{ $k->id }}">
                             <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{{ $k->nik }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{{ $k->nama }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{{ $k->jenis_kelamin }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700">
                                 <span class="block max-w-[220px] truncate" title="{{ $k->email }}">{{ $k->email }}</span>
                             </td>
@@ -185,18 +220,37 @@
                             <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{{ $k->role }}</td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-2 justify-end">
+                                    {{-- Edit Data (dengan loader global) --}}
                                     <button type="button"
                                         class="px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-sm"
-                                        @click="$dispatch('modal-edit-open'); $wire.openEditModal({{ $k->id }})">
+                                        @click="(async () => {
+                                            window.dispatchEvent(new CustomEvent('global-loader-show'));
+                                            try {
+                                              const ok = await $wire.openEditModal({{ $k->id }});
+                                              if (ok) { $dispatch('modal-edit-open'); }
+                                            } finally {
+                                              window.dispatchEvent(new CustomEvent('global-loader-hide'));
+                                            }
+                                          })()">
                                         Edit Data
                                     </button>
 
+                                    {{-- Edit Password (dengan loader global, pola sama seperti Edit Data) --}}
                                     <button type="button"
                                         class="px-3 py-1.5 rounded-lg border border-amber-600 text-amber-700 hover:bg-amber-50 text-sm"
-                                        @click="$dispatch('modal-password-open'); $wire.openPasswordModal({{ $k->id }})">
+                                        @click="(async () => {
+                                            window.dispatchEvent(new CustomEvent('global-loader-show'));
+                                            try {
+                                              const ok = await $wire.openPasswordModal({{ $k->id }});
+                                              if (ok) { $dispatch('modal-password-open'); }
+                                            } finally {
+                                              window.dispatchEvent(new CustomEvent('global-loader-hide'));
+                                            }
+                                          })()">
                                         Edit Password
                                     </button>
 
+                                    {{-- Hapus --}}
                                     <button type="button"
                                         class="px-3 py-1.5 rounded-lg border border-red-600 text-red-700 hover:bg-red-50 text-sm"
                                         @click.prevent="confirmDelete({{ $k->id }}, @js($k->nama))">
@@ -207,7 +261,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-6 text-center text-gray-500">Belum ada data</td>
+                            <td colspan="8" class="px-4 py-6 text-center text-gray-500">Belum ada data</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -258,8 +312,6 @@
                         <span class="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500">
                             <img src="{{ asset('images/dropdown_icon.svg') }}" class="h-5 w-5" alt="dropdown">
                         </span>
-
-                        {{-- sekarang primary key nya bernama id sesuai dengan penamaan standar database --}}
                     </div>
                 </div>
             </div>

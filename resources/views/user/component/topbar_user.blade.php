@@ -1,16 +1,18 @@
+{{-- resources/views/layouts/partials/topbar.blade.php --}}
 @php
     use Illuminate\Support\Facades\Auth;
     use Illuminate\Support\Facades\Route;
+    use Illuminate\Support\Str;
 
     $user = Auth::user();
 
-    // Hanya admin yang melihat tombol "Pindah Mode"
-    $isAdmin =
-        $user && (($user->role ?? null) === 'admin' || ($user->is_admin ?? false) || session('role') === 'admin');
+    // === HAK AKSES TOMBOL "PINDAH MODE" ===
+    // Muncul hanya untuk admin & co-admin
+    $canSwitchMode = $user && in_array($user->role ?? '', ['admin', 'co-admin'], true);
 
     // ===== Foto privat via controller (stream) =====
     $idKaryawan = $user->id_karyawan ?? ($user->id ?? null);
-    $punyaFoto = !empty($user->foto ?? null);
+    $punyaFoto  = !empty($user->foto ?? null);
 
     // Pilih nama route yang tersedia agar tidak RouteNotFoundException
     $photoUrl = null;
@@ -23,8 +25,14 @@
         }
     }
 
-    // Nama & cache-buster
-    $displayName = $user->nama ?? ($user->name ?? 'User');
+    // ✅ Pakai nama depan dari accessor; fallback: ambil kata pertama dari 'nama' / 'name'
+    $displayName = 'User';
+    if ($user) {
+        $displayName = $user->first_name
+            ?: Str::of($user->nama ?? ($user->name ?? 'User'))->squish()->explode(' ')->first();
+    }
+
+    // Nama & cache-buster foto
     $pfVer = session('pf_ver'); // contoh: now()->timestamp
 @endphp
 
@@ -65,7 +73,10 @@
                    this.ver = (e.detail && e.detail.version) ? e.detail.version : Date.now();
                  });
                  window.addEventListener("self-profile:name-updated", (e) => {
-                   if (e.detail && e.detail.name) this.name = e.detail.name;
+                   if (e.detail && e.detail.name) {
+                     const raw = String(e.detail.name).trim().replace(/\s+/gu, " ");
+                     this.name = raw ? raw.split(" ")[0] : this.name; // ✅ tampilkan nama depan saja
+                   }
                  });
                }
              }'>
@@ -110,8 +121,8 @@
                     <p class="text-sm font-semibold text-gray-900 truncate" x-text="name">{{ $displayName }}</p>
                 </div>
 
-                {{-- Tampil hanya untuk admin --}}
-                @if ($isAdmin)
+                {{-- Tampil hanya untuk admin & co-admin --}}
+                @if ($canSwitchMode)
                     <a href="{{ url('/') }}"
                        class="flex items-center gap-2 px-4 py-2 text-sm text-gray-800 hover:bg-gray-50"
                        role="menuitem">

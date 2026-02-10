@@ -49,4 +49,28 @@ class Presensi extends Model
     {
         return $this->belongsTo(Izin::class, 'izin_id', 'id');
     }
+
+    /**
+     * Accessor KHUSUS tugas: status_label_tugas
+     * -----------------------------------------
+     * Dipakai di UI agar:
+     * - Jika status_presensi = 'hadir' dan izin terkait bertipe 'tugas' → "Hadir (Tugas)"
+     * - Selain itu → ucfirst(status_presensi)
+     *
+     * Catatan performa:
+     * - Disarankan eager-load relasi 'izin' di query (lihat Livewire) agar tidak N+1.
+     */
+    public function getStatusLabelTugasAttribute(): string
+    {
+        $status = strtolower((string) $this->status_presensi);
+
+        // Ambil jenis izin (pakai hasil eager load kalau ada; kalau belum, Laravel akan lazy-load 1x)
+        $izinJenis = $this->izin?->jenis ?? null;
+
+        if ($status === 'hadir' && $izinJenis === 'tugas') {
+            return 'Hadir (Tugas)';
+        }
+
+        return ucfirst((string) $this->status_presensi);
+    }
 }

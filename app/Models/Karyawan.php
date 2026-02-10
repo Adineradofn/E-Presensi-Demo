@@ -18,6 +18,7 @@ class Karyawan extends Authenticatable
     protected $fillable = [
         'nik', 'nama', 'alamat', 'email', 'password',
         'divisi', 'jabatan', 'foto', 'role',
+        'jenis_kelamin', // ⬅️ ditambahkan
     ];
 
     // Sembunyikan field sensitif saat toArray()/toJson()

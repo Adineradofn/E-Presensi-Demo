@@ -14,22 +14,24 @@
      aria-modal="true"
      aria-labelledby="modalEditTitle"
 
-     {{-- ⬇️ ini tidak diubah: masih pakai event modal-edit-open --}}
      x-on:modal-edit-open.window="
        open = true;
+       isInitializing = true;
        $nextTick(async () => {
          try {
            const url = await $wire.getEditCurrentPhotoUrl();
            if (url) {
              setPreview(url);
-             await $wire.set('removePhoto', false); // ada foto lama
+             await $wire.set('removePhoto', false);
            } else {
              resetPreview();
-             await $wire.set('removePhoto', true);  // tidak ada foto lama
+             await $wire.set('removePhoto', true);
            }
          } catch (e) {
            resetPreview();
            await $wire.set('removePhoto', true);
+         } finally {
+           isInitializing = false;
          }
        });
      "
@@ -37,7 +39,6 @@
      x-on:modal-edit-close.window="close()"
      x-on:open-edit.window="openWith($event.detail)"
 
-     {{-- sinkron Livewire → Alpine untuk loading & progress upload --}}
      x-on:livewire-upload-start="uploading = true; uploadProgress = 0"
      x-on:livewire-upload-finish="uploading = false; uploadProgress = 0"
      x-on:livewire-upload-error="uploading = false"
@@ -51,21 +52,41 @@
          x-ref="panel"
          x-transition.scale.origin.center>
 
+      <!-- Header -->
       <div class="sticky top-0 z-20 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white">
         <div class="flex items-center gap-3">
           <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
             <img src="{{ asset('images/edit_white_icon.svg') }}" class="h-6 w-6" alt="edit karyawan">
           </span>
-          <h3 id="modalEditTitle" class="text-base sm:text-lg font-semibold">
-            Ubah Data Karyawan <span class="font-normal opacity-90" x-text="form.nama ? `— ${form.nama}` : ''"></span>
-          </h3>
+
+          <div class="flex items-center gap-2">
+            <h3 id="modalEditTitle" class="text-base sm:text-lg font-semibold">
+              Ubah Data Karyawan
+              <span class="font-normal opacity-90" x-text="form.nama ? `— ${form.nama}` : ''"></span>
+            </h3>
+
+            <!-- PRO LOADING BADGE (inline, next to title) -->
+            <div x-show="isInitializing"
+                 x-transition.opacity
+                 role="status"
+                 aria-live="polite"
+                 class="inline-flex items-center gap-2 rounded-full bg-white/15 ring-1 ring-white/30 px-2.5 py-1 text-[11px] sm:text-xs font-medium">
+              <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3"></path>
+              </svg>
+              <span>Memuat data…</span>
+            </div>
+          </div>
         </div>
+
         <button type="button"
                 class="inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/60"
                 aria-label="Tutup modal" @click="close()">
           <img src="{{ asset('images/cancel_icon.svg') }}" class="h-8 w-8" alt="cancel">
         </button>
       </div>
+      <!-- /Header -->
 
       <div class="max-h-[70vh] overflow-y-auto px-5 py-5" data-scroll-area="edit">
         <form id="formEdit" wire:submit.prevent="update" class="grid grid-cols-1 sm:grid-cols-2 gap-4"
@@ -175,6 +196,25 @@
             @enderror
           </div>
 
+          {{-- Jenis Kelamin (Edit) --}}
+          <div class="sm:col-span-1">
+            <label class="text-sm font-medium text-gray-700">Jenis Kelamin <span class="text-red-600">*</span></label>
+            <select name="jenis_kelamin" wire:model.defer="edit.jenis_kelamin"
+                    aria-invalid="{{ $errors->has('edit.jenis_kelamin') ? 'true' : 'false' }}"
+                    @class([
+                        'mt-1 w-full rounded-xl border bg-white/80 px-3 py-2 focus:outline-none',
+                        'focus:ring-emerald-500 focus:border-emerald-500 border-gray-300' => !$errors->has('edit.jenis_kelamin'),
+                        'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.jenis_kelamin'),
+                    ])>
+              <option value="">— Pilih Jenis Kelamin —</option>
+              <option value="Laki-Laki">Laki-Laki</option>
+              <option value="Perempuan">Perempuan</option>
+            </select>
+            @error('edit.jenis_kelamin')
+              <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+            @enderror
+          </div>
+
           {{-- Foto --}}
           <div class="sm:col-span-2">
             <label class="text-sm font-medium text-gray-700">Foto (opsional)</label>
@@ -190,7 +230,6 @@
                               'border-red-400 focus:ring-red-500 focus:border-red-500' => $errors->has('edit.foto'),
                          ])>
 
-                  {{-- Tombol Hapus (ikon saja) --}}
                   <button
                     type="button"
                     class="inline-flex items-center justify-center h-10 w-10 rounded-xl border
@@ -206,7 +245,6 @@
                   </button>
                 </div>
 
-                {{-- progress upload --}}
                 <div class="mt-2" x-show="uploading" x-transition>
                   <div class="h-2 w-full rounded bg-gray-200 overflow-hidden">
                     <div class="h-2 bg-emerald-500" :style="`width:${uploadProgress}%;`"></div>
@@ -224,7 +262,6 @@
                 @enderror
               </div>
 
-              {{-- preview --}}
               <div class="sm:col-span-1" wire:ignore>
                 <div class="aspect-square rounded-xl border border-gray-200 bg-gray-50 overflow-hidden grid place-items-center">
                   <img x-ref="fotoPreview" alt="Preview Foto" class="hidden h-full w-full object-cover" />
@@ -246,6 +283,7 @@
                     ])>
               <option value="">— Pilih Role —</option>
               <option value="admin">Admin</option>
+              <option value="co-admin">Co-admin</option> {{-- ⬅️ baru --}}
               <option value="karyawan">Karyawan</option>
             </select>
             @error('edit.role')
@@ -283,8 +321,8 @@ function editModal() {
     open: false,
     uploading: false,
     uploadProgress: 0,
+    isInitializing: false, // ⬅️ state untuk loading di header
 
-    // Biar tetap kompatibel kalau kamu juga pakai openWith(payload)
     fotoUrlTemplate: @js(route('admin.data.karyawan.foto', ['karyawan' => 0])),
     form: { id:'', nik:'', nama:'', alamat:'', email:'', divisi:'', jabatan:'', role:'' },
 
@@ -297,7 +335,7 @@ function editModal() {
       if (!img || !empty) return;
       if (url) {
         img.src = url;
-        img.onerror = () => { this.setPreview(null); }; // kalau 404 → sembunyikan
+        img.onerror = () => { this.setPreview(null); };
         img.classList.remove('hidden');
         empty.classList.add('hidden');
       } else {
@@ -322,7 +360,7 @@ function editModal() {
       }
       const url = URL.createObjectURL(file);
       this.setPreview(url);
-      this.$wire.set('removePhoto', false); // ada file baru
+      this.$wire.set('removePhoto', false);
     },
 
     removeCurrentPhoto() {
@@ -330,8 +368,9 @@ function editModal() {
       this.$wire.set('removePhoto', true);
     },
 
-    // Tetap disediakan kalau kamu kadang manggil open-edit dengan payload
     openWith(p) {
+      this.isInitializing = true;
+
       this.form.id = p?.id ?? '';
       this.form.nik = p?.nik ?? '';
       this.form.nama = p?.nama ?? '';
@@ -358,6 +397,8 @@ function editModal() {
         );
         const first = document.querySelector('#formEdit input, #formEdit select, #formEdit textarea, #formEdit button');
         first?.focus?.();
+        // Beri sedikit waktu untuk render pertama, lalu matikan indikator
+        requestAnimationFrame(() => { this.isInitializing = false; });
       });
     },
 
@@ -366,6 +407,7 @@ function editModal() {
       this.resetPreview();
       this.uploading = false;
       this.uploadProgress = 0;
+      this.isInitializing = false;
       $wire.resetEditForm?.();
     }
   }

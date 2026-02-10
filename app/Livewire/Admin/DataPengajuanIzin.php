@@ -11,12 +11,16 @@ use Carbon\Carbon;
 use Illuminate\Validation\Rule;
 use App\Models\Izin;
 use RealRashid\SweetAlert\Facades\Alert;
+use Illuminate\Support\Facades\Auth;
 
 #[Layout('admin.app_admin')]
 #[Title('Pengajuan Izin')]
 class DataPengajuanIzin extends Component
 {
     use WithPagination;
+
+    /** gunakan tailwind seperti di contoh */
+    protected string $paginationTheme = 'tailwind';
 
     #[Url(as: 'mode', except: 'hari')]
     public string $mode = 'hari'; // hari|bulan|tahun
@@ -32,6 +36,9 @@ class DataPengajuanIzin extends Component
 
     #[Url(as: 'q', except: '')]
     public string $q = '';
+
+    /** perPage seperti contoh (tanpa mengubah UI) */
+    public int $perPage = 10;
 
     // State untuk modal ubah status
     public ?int $selectedIzinId = null;
@@ -50,6 +57,7 @@ class DataPengajuanIzin extends Component
         'month' => ['except' => null],
         'year'  => ['except' => null],
         'q'     => ['except' => ''],
+        // NOTE: perPage tidak dimasukkan ke query string agar UI tetap tidak berubah
     ];
 
     public function mount(): void
@@ -57,6 +65,13 @@ class DataPengajuanIzin extends Component
         $this->tz = config('app.timezone', 'Asia/Makassar');
         $this->ensureDefaultsForMode();
     }
+
+    /** reset page saat parameter pencarian berubah — mengikuti pola contoh */
+    public function updatingQ()       { $this->resetPage(); }
+    public function updatedDate()     { $this->resetPage(); }
+    public function updatedMonth()    { $this->resetPage(); }
+    public function updatedYear()     { $this->resetPage(); }
+    public function updatedPerPage()  { $this->resetPage(); }
 
     public function setMode(string $mode): void
     {
@@ -104,6 +119,31 @@ class DataPengajuanIzin extends Component
         return [$start, $end];
     }
 
+    /**
+     * Batas edit bulanan = tanggal 5 bulan berikutnya, akhir hari (23:59:59)
+     * contoh: 2025-09-xx -> 2025-10-05 23:59:59
+     */
+    private function monthlyEditDeadline(Carbon|string $tanggalPengajuan): Carbon
+    {
+        $submitted = $tanggalPengajuan instanceof Carbon
+            ? $tanggalPengajuan->copy()->setTimezone($this->tz)
+            : Carbon::parse($tanggalPengajuan, $this->tz);
+
+        return $submitted->copy()
+            ->addMonthNoOverflow()
+            ->startOfMonth()
+            ->addDays(4) // pindah ke tanggal 5
+            ->endOfDay();
+    }
+
+    /** Apakah sekarang masih <= batas edit bulanan */
+    private function isWithinMonthlyEditWindow(Carbon|string $tanggalPengajuan): bool
+    {
+        $now    = Carbon::now($this->tz);
+        $cutoff = $this->monthlyEditDeadline($tanggalPengajuan);
+        return $now->lte($cutoff);
+    }
+
     public function render()
     {
         [$start, $end] = $this->resolveRange();
@@ -136,11 +176,21 @@ class DataPengajuanIzin extends Component
             });
         }
 
-        // ⛏️ FIX: gunakan karyawan_id (bukan id_karyawan) & standar PK id
+        // ================== INTI PERMINTAAN BARU ==================
+        // - admin: HANYA melihat 'tugas'
+        // - co-admin: melihat SELAIN 'tugas'
+        $role = strtolower((string) (Auth::user()->role ?? ''));
+        if ($role === 'admin') {
+            $query->where('jenis', 'tugas');
+        } elseif ($role === 'co-admin') {
+            $query->where('jenis', '!=', 'tugas');
+        }
+        // ===========================================================
+
         $items = $query
             ->orderBy('tanggal_pengajuan', 'desc')
             ->orderBy('karyawan_id', 'asc')
-            ->paginate(15)
+            ->paginate($this->perPage)    // ← seperti contoh
             ->withQueryString();
 
         $current_date  = $this->mode === 'hari'  ? $start->toDateString() : null;
@@ -166,29 +216,44 @@ class DataPengajuanIzin extends Component
 
         $izin = Izin::with('karyawan')->findOrFail($data['selectedIzinId']);
 
-        // Hanya boleh ubah untuk 'izin terlambat' & 'tugas' (sesuai spesifikasi)
+        // Co-admin tidak boleh memproses 'tugas'
+        $role = strtolower((string) (Auth::user()->role ?? ''));
+        if ($role !== 'admin' && $izin->jenis === 'tugas') {
+            Alert::error('Ditolak', 'Hanya admin yang dapat memproses pengajuan tugas.');
+            $this->dispatch('close-izin-modal');
+            return;
+        }
+
+        // Hanya boleh ubah untuk 'izin terlambat' & 'tugas'
         if (!in_array($izin->jenis, ['izin terlambat','tugas'], true)) {
             Alert::error('Ditolak', 'Perubahan status hanya untuk izin terlambat & tugas.');
             $this->dispatch('close-izin-modal');
             return;
         }
 
+        // >>> Guard: Batas waktu edit bulanan (maks tgl 5 bulan berikutnya, end-of-day)
+        if (!$this->isWithinMonthlyEditWindow($izin->tanggal_pengajuan)) {
+            $cutoff = $this->monthlyEditDeadline($izin->tanggal_pengajuan)->format('Y-m-d');
+            Alert::error('Ditolak', "Pengajuan bulan {$izin->tanggal_pengajuan->format('Y-m')} hanya bisa diubah sampai {$cutoff}.");
+            $this->dispatch('close-izin-modal');
+            return;
+        }
+
         $izin->update(['status' => $data['selectedStatus']]);
 
-        // Recalculate presensi di range izin (opsional, tapi sesuai desain final)
+        // Recalculate presensi di range izin (opsional)
         try {
             $svc = app(\App\Services\AttendanceService::class);
             $start = Carbon::parse($izin->tanggal_mulai, $this->tz);
             $end   = Carbon::parse($izin->tanggal_selesai, $this->tz);
             $svc->recalculateRange($izin->karyawan_id, $start, $end);
         } catch (\Throwable $e) {
-            // Jangan gagal UI, cukup lanjut (bisa dilog jika diinginkan)
+            // optional logging
         }
 
         Alert::success('Berhasil', 'Status pengajuan izin diperbarui.');
         $this->dispatch('close-izin-modal');
 
-        // Tetap di halaman dengan filter aktif
         return redirect()->route('admin.pengajuan-izin', array_filter([
             'mode'  => $this->mode,
             'date'  => $this->date,

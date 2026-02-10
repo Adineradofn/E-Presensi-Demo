@@ -61,9 +61,7 @@
 
     {{-- ========================= DESKTOP TABLE ========================= --}}
     <div class="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm mt-2 hidden sm:block">
-        {{-- table-fixed: tetap tanpa scroll horizontal --}}
         <table class="min-w-full table-fixed">
-            {{-- SEMUA HEADER RATA TENGAH --}}
             <thead class="bg-gray-50 text-gray-700">
                 <tr>
                     <th class="px-4 py-3 text-sm font-semibold text-center">NIK</th>
@@ -120,20 +118,31 @@
                             default     => 'bg-gray-100 text-gray-700',
                         };
 
-                        $canEdit = in_array($jenis, ['tugas', 'izin terlambat'], true);
+                        $role = strtolower(auth()->user()->role ?? '');
+
+                        // Batasi edit sampai tgl 5 bulan berikutnya (end-of-day)
+                        $withinDeadline = false;
+                        if ($row->tanggal_pengajuan) {
+                            $deadline = $row->tanggal_pengajuan->copy()
+                                ->addMonthNoOverflow()
+                                ->startOfMonth()
+                                ->addDays(4)
+                                ->endOfDay();
+                            $withinDeadline = now()->lte($deadline);
+                        }
+
+                        $canEdit = in_array($jenis, ['tugas', 'izin terlambat'], true)
+                                   && (
+                                        $jenis === 'izin terlambat'
+                                        || ($jenis === 'tugas' && $role === 'admin')
+                                   )
+                                   && $withinDeadline;
                     @endphp
 
                     <tr class="hover:bg-gray-50">
-                        {{-- Rata tengah & single-line --}}
                         <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap truncate max-w-[6rem]">{{ $nik }}</td>
                         <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap">{{ $pengajuan }}</td>
-
-                        {{-- NAMA: rata kiri & boleh turun --}}
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900 align-top text-left whitespace-normal break-words">
-                            {{ $nama }}
-                        </td>
-
-                        {{-- Rata tengah & single-line --}}
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900 align-middle text-left whitespace-normal break-words">{{ $nama }}</td>
                         <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap truncate max-w-[12rem]" title="{{ $jabatan }}">{{ $jabatan }}</td>
                         <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap truncate max-w-[10rem]" title="{{ $divisi }}">{{ $divisi }}</td>
 
@@ -144,31 +153,27 @@
                         <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap">{{ $mulai }}</td>
                         <td class="px-4 py-3 text-sm text-gray-700 text-center whitespace-nowrap">{{ $akhir }}</td>
 
-                        {{-- ALASAN: rata kiri & boleh turun --}}
-                        <td class="px-4 py-3 text-sm text-gray-700 align-top text-left whitespace-normal break-words">
-                            {{ $alasan }}
-                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700 align-middle text-left whitespace-normal break-words">{{ $alasan }}</td>
 
                         <td class="px-4 py-3 text-sm text-center whitespace-nowrap">
                             <span class="px-2 py-1 rounded-full text-xs font-medium {{ $statusClass }}">{{ ucfirst($status) }}</span>
                         </td>
 
-                        {{-- AKSI: kontainer boleh wrap ke bawah jika sempit; item tetap single-line --}}
                         <td class="px-4 py-3 text-sm text-center">
                             <div class="flex flex-wrap items-center justify-center gap-2">
-                                {{-- Bukti --}}
+                                {{-- Tombol Bukti --}}
                                 <button type="button"
-                                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border hover:bg-gray-50 disabled:opacity-50 overflow-hidden whitespace-nowrap"
+                                        class="inline-flex items-center justify-center gap-1 w-28 px-3 py-1.5 rounded-lg border hover:bg-gray-50 disabled:opacity-50 overflow-hidden whitespace-nowrap"
                                         title="Lihat bukti" onclick="openBukti(this)" data-url="{{ $buktiUrl }}"
                                         {{ $hasFile ? '' : 'disabled' }}>
                                     <img src="{{ asset('images/letter_icon.svg') }}" class="h-5 w-5 shrink-0" alt="bukti surat">
                                     <span class="text-xs text-gray-700 truncate">Bukti</span>
                                 </button>
 
-                                {{-- Edit Status (muncul hanya jika boleh) --}}
                                 @if ($canEdit)
+                                    {{-- Tombol Edit --}}
                                     <button type="button"
-                                            class="px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-sm"
+                                            class="inline-flex items-center justify-center w-28 px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-sm"
                                             title="Ubah Status"
                                             aria-label="Ubah Status {{ $nama }} {{ $mulai }}-{{ $akhir }}"
                                             @click="
@@ -235,11 +240,28 @@
                     default     => 'bg-gray-100 text-gray-700',
                 };
 
-                $canEdit = in_array($jenis, ['tugas', 'izin terlambat'], true);
+                $role = strtolower(auth()->user()->role ?? '');
+
+                // Batasi edit sampai tgl 5 bulan berikutnya (end-of-day)
+                $withinDeadline = false;
+                if ($row->tanggal_pengajuan) {
+                    $deadline = $row->tanggal_pengajuan->copy()
+                        ->addMonthNoOverflow()
+                        ->startOfMonth()
+                        ->addDays(4)
+                        ->endOfDay();
+                    $withinDeadline = now()->lte($deadline);
+                }
+
+                $canEdit = in_array($jenis, ['tugas', 'izin terlambat'], true)
+                           && (
+                                $jenis === 'izin terlambat'
+                                || ($jenis === 'tugas' && $role === 'admin')
+                           )
+                           && $withinDeadline;
             @endphp
 
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                {{-- Header --}}
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
                         <div class="text-base font-semibold text-gray-900 truncate">{{ $nama }}</div>
@@ -256,7 +278,6 @@
                     </div>
                 </div>
 
-                {{-- Dates --}}
                 <div class="mt-3 grid grid-cols-3 gap-2 text-[12px]">
                     <div class="rounded-lg bg-gray-50 p-2">
                         <div class="text-gray-500 leading-tight">Pengajuan</div>
@@ -272,13 +293,11 @@
                     </div>
                 </div>
 
-                {{-- Alasan --}}
                 <div class="mt-3">
                     <div class="text-[12px] text-gray-500">Alasan</div>
                     <p class="text-sm text-gray-800 break-words">{{ $alasan }}</p>
                 </div>
 
-                {{-- Actions --}}
                 <div class="mt-4 flex flex-wrap items-center gap-2 justify-center">
                     <button type="button"
                             class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border hover:bg-gray-50 disabled:opacity-50 overflow-hidden whitespace-nowrap"
@@ -324,7 +343,7 @@
         {{ $items->onEachSide(1)->links() }}
     </div>
 
-    {{-- Modal --}}
+    {{-- ====== MODALS (file terpisah, tapi tetap di dalam root ini) ====== --}}
     @include('livewire.admin.modals.bukti_pengajuan_izin')
     @include('livewire.admin.modals.edit_status_pengajuan_izin')
 </div>

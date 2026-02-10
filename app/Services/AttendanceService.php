@@ -8,18 +8,25 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon as IlluminateCarbon;
 use Illuminate\Support\Facades\DB;
 
-/**
- * AttendanceService
- * -----------------
- * Prinsip: GANTI, BUKAN TAMBAH.
- * - NO CREATE row presensi.
- * - Update baris yang SUDAH ada.
- */
 class AttendanceService
 {
     public function __construct(
         protected string $tz = 'Asia/Makassar'
     ) {}
+
+    /**
+     * Helper: hitung batas check-in close (jam_masuk + masuk_tutup_sesudah) dari jadwal/jam_kerja.
+     * Return: Carbon atau null kalau jam kerja tidak tersedia.
+     */
+    private function computeCheckinClose(?Presensi $presensi, IlluminateCarbon $date): ?IlluminateCarbon
+    {
+        $jk = $presensi?->jadwal?->jamKerja;
+        if (!$jk) return null;
+
+        $jamMasuk = IlluminateCarbon::parse($date->toDateString().' '.$jk->jam_masuk, $this->tz);
+        $menit    = (int)($jk->masuk_tutup_sesudah ?? 60);
+        return $jamMasuk->copy()->addMinutes($menit);
+    }
 
     /** Recalculate satu hari (NO-CREATE). */
     public function recalculateDay(int $karyawanId, CarbonInterface $date): void
@@ -27,13 +34,13 @@ class AttendanceService
         $date = IlluminateCarbon::instance($date)->timezone($this->tz)->startOfDay();
 
         DB::transaction(function () use ($karyawanId, $date) {
-            $presensi = Presensi::where('karyawan_id', $karyawanId)
+            $presensi = Presensi::with('jadwal.jamKerja')
+                ->where('karyawan_id', $karyawanId)
                 ->whereDate('tanggal', $date->toDateString())
                 ->first();
 
-            if (!$presensi) return; // nunggu scheduler/prepare
+            if (!$presensi) return;
 
-            // Ambil izin overlap (rentang inklusif)
             $izinList = Izin::where('karyawan_id', $karyawanId)
                 ->whereDate('tanggal_mulai', '<=', $date->toDateString())
                 ->whereDate('tanggal_selesai', '>=', $date->toDateString())
@@ -62,7 +69,7 @@ class AttendanceService
                 return;
             }
 
-            // 2) IZIN TERLAMBAT → wajib in+out lengkap; selain itu invalid
+            // 2) IZIN TERLAMBAT (approve) → butuh in+out lengkap
             if ($approvedIzinTerlambat) {
                 $newStatus = ($jamMasuk && $jamPulang) ? 'hadir' : 'invalid';
                 $newIzinId = $approvedIzinTerlambat->id;
@@ -70,7 +77,7 @@ class AttendanceService
                 return;
             }
 
-            // 3) IZIN/SAKIT/CUTI (disetujui)
+            // 3) IZIN/SAKIT/CUTI (approve)
             if ($approvedIzin || $approvedSakit || $approvedCuti) {
                 $izinAktif = $approvedIzin ?: ($approvedSakit ?: $approvedCuti);
 
@@ -87,27 +94,28 @@ class AttendanceService
                 return;
             }
 
-            // 4) TANPA izin disetujui → fakta absen + CEK KETERLAMBATAN
-            // ⛏️ FIX: bila in+out lengkap namun jam_masuk >= 09:00 dan
-            //         tidak ada "izin terlambat" → INVALID (bukan hadir).
+            // 4) TANPA izin disetujui → fakta absen + CEK TERLAMBAT BERDASARKAN JAM_KERJA
             if ($jamMasuk && $jamPulang) {
-                $jamMasukAt = IlluminateCarbon::parse($jamMasuk, $this->tz);
-                $lateCutoff = $date->copy()->setTime(9, 0, 0);
-
-                // tidak ada $approvedIzinTerlambat karena sudah keluar di atas
-                $isLateWithoutIzin = $jamMasukAt->gte($lateCutoff);
-                $newStatus = $isLateWithoutIzin ? 'invalid' : 'hadir';
+                $checkinClose = $this->computeCheckinClose($presensi, $date);
+                if ($checkinClose) {
+                    $jamMasukAt = IlluminateCarbon::parse($jamMasuk, $this->tz);
+                    $isLateWithoutIzin = $jamMasukAt->gte($checkinClose); // >= batas ⇒ terlambat tanpa izin
+                    $newStatus = $isLateWithoutIzin ? 'invalid' : 'hadir';
+                } else {
+                    // Jika tidak ada jam kerja, fallback: jangan ubah (hindari hardcode)
+                    $newStatus = $presensi->status_presensi;
+                }
                 $newIzinId = null;
             } elseif (!$jamMasuk && $jamPulang) {
                 $newStatus = 'invalid';   // only out
                 $newIzinId = null;
             } else {
-                // only-in → biarkan; finalize yang akan memutuskan
-                // none    → paksa alpa, supaya tidak “nempel hadir”
+                // none → alpa (cabut status hadir yang menempel)
                 $newIzinId = null;
                 if (!$jamMasuk && !$jamPulang) {
                     $newStatus = 'alpa';
                 }
+                // only-in: biarkan; finalize yang memutuskan di akhir hari
             }
 
             $this->applyIfChanged($presensi, $newStatus, $newIzinId);
@@ -140,7 +148,7 @@ class AttendanceService
         }
 
         if ($dirty) {
-            $presensi->save(); // akan memicu observer updated (jam) hanya jika jam berubah
+            $presensi->save();
         }
     }
 }

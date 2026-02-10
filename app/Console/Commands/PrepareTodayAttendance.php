@@ -23,30 +23,31 @@ class PrepareTodayAttendance extends Command
         $tz    = config('app.timezone', 'Asia/Makassar');
         $now   = Carbon::now($tz);
         $today = $now->toDateString();
-        $dow   = $now->dayOfWeekIso; // 6=Sabtu,7=Minggu
+        $dow   = $now->dayOfWeekIso; // 1=Senin ... 6=Sabtu, 7=Minggu
 
-        // Weekend => skip
-        if (in_array($dow, [6,7], true)) {
-            $this->info("Weekend {$today} — tidak menyiapkan presensi.");
+        // HANYA Minggu yang libur (Sabtu adalah hari kerja)
+        if ($dow === 7) {
+            $this->info("Minggu {$today} — tidak menyiapkan presensi.");
             return self::SUCCESS;
         }
 
-        // Ambil JamKerja default
-        $jk = JamKerja::firstOrCreate(
-            ['nama' => 'Senin-Sabtu'],
-            [
-                'jam_masuk' => '08:00:00',
-                'jam_pulang'=> '16:00:00',
-                'masuk_buka_sebelum' => 0,
-                'masuk_tutup_sesudah'=> 0,
-                'pulang_buka_sebelum'=> 0,
-                'pulang_tutup_sesudah'=> 0,
-            ]
-        );
+        // Pilih jam kerja berdasarkan hari:
+        // - Sabtu (6)  -> 'sabtu'
+        // - Lainnya     -> 'senin_jumat'
+        $jkName = ($dow === 6) ? 'sabtu' : 'senin-jumat';
 
+        // Ambil JamKerja hasil seed; JANGAN buat baru di sini
+        $jk = JamKerja::where('nama', $jkName)->first();
+        if (!$jk) {
+            $this->error("JamKerja '{$jkName}' tidak ditemukan. Pastikan sudah di-seed sesuai nama tersebut.");
+            return self::FAILURE;
+        }
+
+        // Siapkan jadwal & presensi default (status 'alpa') untuk semua karyawan
         $karyawans = Karyawan::all();
 
         foreach ($karyawans as $kr) {
+            // Jadwal untuk hari ini (idempoten)
             $jadwal = Jadwal::firstOrCreate(
                 [
                     'karyawan_id' => $kr->id,
@@ -58,6 +59,7 @@ class PrepareTodayAttendance extends Command
                 ]
             );
 
+            // Presensi default untuk hari ini (idempoten)
             Presensi::firstOrCreate(
                 [
                     'karyawan_id' => $kr->id,
@@ -70,7 +72,7 @@ class PrepareTodayAttendance extends Command
             );
         }
 
-        $this->info("Disiapkan presensi & jadwal untuk {$today}.");
+        $this->info("Disiapkan presensi & jadwal untuk {$today} (jam kerja: {$jkName}).");
         return self::SUCCESS;
     }
 }

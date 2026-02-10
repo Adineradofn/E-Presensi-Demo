@@ -22,7 +22,7 @@ Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
 
-Route::middleware(['auth', 'role:admin'])
+Route::middleware(['auth', 'role:admin,co-admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -46,21 +46,18 @@ Route::middleware(['auth', 'role:admin'])
             ->where(['jenis' => 'masuk|pulang'])
             ->name('data.presensi.foto.show');
 
-        // (Jika Anda masih memakai export)
-        Route::get('/data-presensi/export', [DataPresensiController::class, 'export'])->name('data.presensi.export');
-
         // Pengajuan Izin
         Route::get('/pengajuan-izin', DataPengajuanIzin::class)->name('pengajuan-izin');
         Route::get('/izin/{izin}/bukti', [DataPengajuanIzinController::class, 'showBukti'])->name('izin.bukti.show');
 
         // REKAP PRESENSI (BARU)
         // routes/web.php (di grup admin)
-        Route::get('/rekap-presensi', \App\Livewire\Admin\RekapPresensi::class)->name('data.rekap-presensi');
+        Route::get('/rekap-presensi',RekapPresensi::class)->name('data.rekap-presensi');
         Route::get('/rekap-presensi/export', RekapPresensiExportController::class)->name('rekap-presensi.export');
         Route::get('/hari-libur', DataHariLibur::class)->name('hari-libur');
     });
 
-Route::middleware(['auth', 'role:admin,karyawan'])->group(function () {
+Route::middleware(['auth', 'role:admin,karyawan,co-admin'])->group(function () {
     Route::get('/home', fn() => view('user.home_user', ['title' => 'Home']))->name('user.home');
 
      Route::get('/data-karyawan/{karyawan}/foto', [FotoKaryawanController::class, 'photoSelf'])

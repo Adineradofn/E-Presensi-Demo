@@ -7,75 +7,74 @@ use App\Models\Presensi;
 use App\Models\Izin;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 /**
- * Controller untuk halaman Dashboard Admin.
- * - View utama hanya butuh judul.
- * - Angka/statistik dipolling via endpoint JSON (stats()) agar realtime.
+ * Dashboard Admin & Co-Admin
+ * - View utama ringan; angka dipolling via endpoint JSON (stats()) agar realtime.
  */
 class DashboardController extends Controller
 {
-    /**
-     * Tampilkan halaman dashboard.
-     * View akan melakukan fetch ke /dashboard/stats untuk mengambil angka terbaru.
-     */
+    /** Halaman dashboard (Blade akan fetch ke stats()). */
     public function index()
     {
-        // Halaman hanya butuh title; angka diambil via fetch() (stats()) agar realtime.
         return view('admin.dashboard', [
             'title' => 'Dashboard',
         ]);
     }
 
     /**
-     * Endpoint JSON untuk statistik realtime dashboard.
+     * Endpoint JSON statistik realtime.
      * GET /dashboard/stats
      *
      * Angka yang dikembalikan:
-     * - hadir:         jumlah presensi status 'hadir' atau 'terlambat' di TANGGAL HARI INI
-     * - terlambat:     jumlah presensi status 'terlambat' di hari ini
-     * - tidak_hadir:   jumlah presensi status 'tidak hadir' di hari ini
-     * - izin_pending:  total permohonan izin berstatus 'pending' (global, tidak dibatasi tanggal)
-     *
-     * Catatan:
-     * - Tanggal hari ini ditentukan berdasarkan timezone aplikasi (default Asia/Makassar).
-     * - Cocok dipanggil berkala dari Blade (polling) agar kartu statistik selalu up-to-date.
+     * - hadir:        jumlah presensi status_presensi = 'hadir' di HARI INI
+     * - absen:        jumlah presensi status_presensi IN ('izin','cuti','alpa','sakit') di HARI INI
+     * - invalid:      jumlah presensi status_presensi = 'invalid' di HARI INI
+     * - izin_pending: total pengajuan izin 'pending' sesuai ROLE:
+     *                 • admin   -> hanya jenis = 'tugas'
+     *                 • co-admin-> selain 'tugas'
+     *                 • lainnya -> global (tanpa filter jenis)
      */
     public function stats(Request $request)
     {
-        // Gunakan timezone dari config; fallback ke Asia/Makassar
-        $tz = config('app.timezone', 'Asia/Makassar');
-
-        // Tentukan tanggal hari ini sesuai timezone (format Y-m-d)
+        $tz    = config('app.timezone', 'Asia/Makassar');
         $today = Carbon::now($tz)->toDateString();
 
-        // === Hitung metrik kehadiran hari ini ===
-
-        // Kehadiran Hari Ini = status 'hadir' + 'terlambat'
-        $hadirHariIni = Presensi::whereDate('tanggal', $today)
-            ->whereIn('status', ['hadir', 'terlambat'])
+        // Kehadiran (hanya 'hadir')
+        $hadir = Presensi::whereDate('tanggal', $today)
+            ->where('status_presensi', 'hadir')
             ->count();
 
-        // Terlambat = status 'terlambat'
-        $terlambat = Presensi::whereDate('tanggal', $today)
-            ->where('status', 'terlambat')
+        // Tidak Hadir terklasifikasi: izin|cuti|alpa|sakit
+        $absen = Presensi::whereDate('tanggal', $today)
+            ->whereIn('status_presensi', ['izin', 'cuti', 'alpa', 'sakit'])
             ->count();
 
-        // Tidak Hadir = status 'tidak hadir'
-        $tidakHadir = Presensi::whereDate('tanggal', $today)
-            ->where('status', 'tidak hadir')
+        // Invalid
+        $invalid = Presensi::whereDate('tanggal', $today)
+            ->where('status_presensi', 'invalid')
             ->count();
 
-        // Izin Pending (global, tidak dibatasi tanggal)
-        $izinPending = Izin::where('status', 'pending')->count();
+        // Izin pending (role-aware)
+        $role = strtolower((string) (Auth::user()->role ?? ''));
+        $izinQuery = Izin::query()->where('status', 'pending');
 
-        // Kembalikan response JSON untuk dikonsumsi oleh frontend (Blade/JS)
+        if ($role === 'admin') {
+            // Admin hanya melihat pengajuan TUGAS
+            $izinQuery->where('jenis', 'tugas');
+        } elseif ($role === 'co-admin') {
+            // Co-admin hanya selain TUGAS
+            $izinQuery->where('jenis', '!=', 'tugas');
+        }
+        $izinPending = $izinQuery->count();
+
         return response()->json([
-            'date'         => $today,        // tanggal acuan perhitungan
-            'hadir'        => $hadirHariIni, // total hadir (termasuk terlambat)
-            'terlambat'    => $terlambat,    // total terlambat
-            'tidak_hadir'  => $tidakHadir,   // total tidak hadir
-            'izin_pending' => $izinPending,  // total izin berstatus pending
+            'date'         => $today,
+            'hadir'        => $hadir,
+            'absen'        => $absen,
+            'invalid'      => $invalid,
+            'izin_pending' => $izinPending,
         ]);
     }
 }

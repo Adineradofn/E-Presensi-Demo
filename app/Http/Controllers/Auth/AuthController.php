@@ -1,27 +1,27 @@
 <?php
 
 namespace App\Http\Controllers\Auth;
-use App\Http\Controllers\Controller;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Http\RedirectResponse;
 
 class AuthController extends Controller
 {
-    // Tampilkan form login
+    /**
+     * Tampilkan form login.
+     * Jika sudah login, langsung redirect sesuai role.
+     */
     public function showLoginForm(Request $request)
     {
-        // Jika sudah login, arahkan sesuai role (admin/karyawan)
-        if (Auth::check()) { // <- sudah diperbaiki (hapus satu ')')
-            $role = (string) (Auth::user()->role ?? '');
+        if (Auth::check()) {
+            if ($resp = $this->redirectByRole(Auth::user()->role ?? null)) {
+                return $resp;
+            }
 
-            // Admin ke dashboard admin
-            if ($role === 'admin')   return redirect()->route('admin.mode');
-            // Karyawan ke beranda user
-            if ($role === 'karyawan') return redirect()->route('user.home');
-
-            // Jika role tidak dikenali → paksa logout & kembali ke login
+            // Role tidak dikenali → logout paksa & kembali ke login
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
@@ -33,14 +33,16 @@ class AuthController extends Controller
         return view('auth.login', ['title' => 'Login']);
     }
 
-    // Proses login
+    /**
+     * Proses login.
+     */
     public function login(Request $request)
     {
         // Validasi input dasar (pesan dalam bahasa Indonesia)
         $credentials = $request->validate(
             [
-                'nik'      => ['required','string','max:100'],
-                'password' => ['required','string'],
+                'nik'      => ['required', 'string', 'max:100'],
+                'password' => ['required', 'string'],
             ],
             [
                 'nik.required'      => 'NIK wajib diisi.',
@@ -51,7 +53,7 @@ class AuthController extends Controller
         // Ingat saya (checkbox)
         $remember = $request->boolean('remember');
 
-        // (Opsional) Normalisasi NIK: hapus spasi agar konsisten
+        // Normalisasi NIK: hapus spasi agar konsisten
         $nik = preg_replace('/\s+/', '', $credentials['nik']);
 
         // Coba autentikasi dengan field 'nik' + 'password'
@@ -59,17 +61,18 @@ class AuthController extends Controller
             // Regenerasi session untuk mencegah session fixation
             $request->session()->regenerate();
 
-            // Arahkan berdasarkan role
-            $role = (string) (Auth::user()->role ?? '');
-            if ($role === 'admin')   return redirect()->route('admin.mode');
-            if ($role === 'karyawan') return redirect()->route('user.home');
+            // Redirect berdasarkan role
+            if ($resp = $this->redirectByRole(Auth::user()->role ?? null)) {
+                return $resp;
+            }
 
             // Jika role kosong/tidak valid → logout paksa dan beri pesan error
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return redirect()->route('login')
+            return redirect()
+                ->route('login')
                 ->withErrors(['auth' => 'Akun Anda belum memiliki role yang valid. Hubungi admin.']);
         }
 
@@ -77,12 +80,11 @@ class AuthController extends Controller
         throw ValidationException::withMessages([
             'auth' => 'NIK atau password salah.',
         ])->redirectTo(route('login'));
-
-        // Alternatif tanpa exception:
-        // return back()->withErrors(['auth' => 'NIK atau password salah.'])->onlyInput('nik');
     }
 
-    // Proses logout
+    /**
+     * Proses logout.
+     */
     public function logout(Request $request)
     {
         // Hapus autentikasi & invalidasi sesi
@@ -92,5 +94,20 @@ class AuthController extends Controller
 
         // Kembali ke halaman login
         return redirect()->route('login');
+    }
+
+    /**
+     * Helper: arahkan sesuai role.
+     * - admin, co-admin → admin.mode
+     * - karyawan        → user.home
+     * - lainnya         → null (biar caller yang tentukan fallback)
+     */
+    private function redirectByRole(?string $role): ?RedirectResponse
+    {
+        return match ($role) {
+            'admin', 'co-admin' => redirect()->route('admin.mode'),
+            'karyawan'          => redirect()->route('user.home'),
+            default             => null,
+        };
     }
 }

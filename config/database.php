@@ -34,7 +34,18 @@ return [
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),
-            'database' => env('DB_DATABASE', database_path('database.sqlite')),
+            'database' => value(function () {
+                // HACK: Copy database to /tmp for Vercel (read-only filesystem workaround)
+                if (isset($_SERVER['VERCEL']) || isset($_ENV['VERCEL'])) {
+                    $source = database_path('database.sqlite');
+                    $destination = '/tmp/database.sqlite';
+                    if (!file_exists($destination) && file_exists($source)) {
+                        copy($source, $destination);
+                    }
+                    return $destination;
+                }
+                return env('DB_DATABASE', database_path('database.sqlite'));
+            }),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
             'busy_timeout' => null,

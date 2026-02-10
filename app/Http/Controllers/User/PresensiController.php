@@ -23,13 +23,40 @@ class PresensiController extends Controller
     }
 
     /**
+     * Helper: ambil konfigurasi jam kerja untuk presensi hari ini.
+     * Sumber: Presensi -> Jadwal -> JamKerja
+     */
+    private function resolveJamKerjaForToday(?Presensi $presensi, string $tz, string $tgl): ?array
+    {
+        $jk = $presensi?->jadwal?->jamKerja;
+        if (!$jk) return null;
+
+        // Waktu pokok
+        $jamMasuk  = Carbon::parse($tgl.' '.$jk->jam_masuk,  $tz);
+        $jamPulang = Carbon::parse($tgl.' '.$jk->jam_pulang, $tz);
+
+        // Parameter gate (menit)
+        $masukTutupSesudah   = (int)($jk->masuk_tutup_sesudah   ?? 60); // default 60 (sesuai kebutuhanmu)
+        $pulangBukaSebelum   = (int)($jk->pulang_buka_sebelum   ?? 30); // default 30
+
+        // Turunan:
+        // - check-in "invalid tanpa izin" jika >= jam_masuk + masuk_tutup_sesudah
+        // - check-in ditolak jika waktu sudah memasuki "jendela check-out" (>= jam_pulang - pulang_buka_sebelum)
+        // - check-out dibuka pada (jam_pulang - pulang_buka_sebelum)
+        $checkinClose  = $jamMasuk->copy()->addMinutes($masukTutupSesudah);
+        $checkoutOpen  = $jamPulang->copy()->subMinutes($pulangBukaSebelum);
+
+        return compact('jamMasuk', 'jamPulang', 'checkinClose', 'checkoutOpen');
+    }
+
+    /**
      * Check-In
      * Aturan:
      * - Blok jika ada izin tugas (disetujui).
-     * - Check-in >= 15:30 → tolak (tidak simpan).
-     * - Check-in >= 09:00 tanpa izin terlambat disetujui → simpan + status invalid.
-     * - Check-in <  09:00 → simpan + status hadir.
-     * - TIDAK MEMBUAT presensi baru: jika baris belum ada → tolak (nunggu jadwal).
+     * - Tidak membuat baris presensi baru (wajib sudah disiapkan via prepare-today).
+     * - Check-in DITOLAK jika waktu sudah memasuki jendela check-out (>= jam_pulang - pulang_buka_sebelum).
+     * - Check-in >= (jam_masuk + masuk_tutup_sesudah) tanpa "izin terlambat" → simpan + INVALID.
+     * - Selain itu → simpan + HADIR (nanti service akan evaluasi ulang saat needed).
      */
     public function checkIn(Request $r)
     {
@@ -54,24 +81,34 @@ class PresensiController extends Controller
             return back()->with('error', 'Anda sedang masa tugas.');
         }
 
-        // Waktu maksimal check-in
-        if ($now->gte($now->copy()->setTime(15,30,0))) {
-            return back()->with('error', 'Waktu absen masuk sudah lewat.');
-        }
-
         // Ambil baris presensi hari ini — JANGAN BUAT KALAU TIDAK ADA
-        $pres = Presensi::where('karyawan_id', $idK)->whereDate('tanggal', $tgl)->first();
+        $pres = Presensi::with('jadwal.jamKerja')
+            ->where('karyawan_id', $idK)
+            ->whereDate('tanggal', $tgl)
+            ->first();
+
         if (!$pres) {
-            return back()->with('error', 'Belum ada jadwal presensi hari ini. Silakan coba lagi setelah jadwal dibuat oleh sistem.');
+            return back()->with('error', 'Belum ada jadwal presensi hari ini. Coba lagi setelah sistem menyiapkan presensi.');
         }
 
         if ($pres->jam_masuk) {
             return back()->with('error', 'Anda sudah absen masuk.');
         }
 
-        // Late tanpa izin terlambat → invalid
+        // Ambil konfigurasi jam kerja dari DB
+        $jk = $this->resolveJamKerjaForToday($pres, $tz, $tgl);
+        if (!$jk) {
+            return back()->with('error', 'Konfigurasi jam kerja belum terpasang pada jadwal hari ini. Hubungi admin.');
+        }
+
+        // Waktu maksimal check-in: jika waktu sudah memasuki "jendela check-out", tolak
+        if ($now->gte($jk['checkoutOpen'])) {
+            return back()->with('error', 'Waktu absen masuk sudah lewat.');
+        }
+
+        // Late tanpa izin terlambat → INVALID
         $lateInvalid = false;
-        if ($now->gte($now->copy()->setTime(9,0,0))) {
+        if ($now->gte($jk['checkinClose'])) {
             $hasApprovedLate = Izin::where('karyawan_id', $idK)
                 ->where('jenis', 'izin terlambat')
                 ->where('status', 'disetujui')
@@ -95,7 +132,7 @@ class PresensiController extends Controller
             'status_presensi' => $lateInvalid ? 'invalid' : 'hadir',
         ]);
 
-        // Sinkron (idempoten)
+        // Sinkron (idempoten) — service akan evaluasi kembali sesuai izin & jam kerja
         $this->svc->recalculateDay($idK, $now);
 
         return back()->with('success', 'Absen masuk tersimpan.');
@@ -105,12 +142,12 @@ class PresensiController extends Controller
      * Check-Out
      * Aturan:
      * - Blok jika ada izin tugas (disetujui).
-     * - Check-out < 15:30 → tolak (tidak simpan).
-     * - Only check-out (tanpa check-in) → simpan + invalid (HANYA kalau baris presensi sudah ada).
-     * - TIDAK MEMBUAT presensi baru: jika baris belum ada → tolak (nunggu jadwal).
+     * - Check-out < (jam_pulang - pulang_buka_sebelum) → tolak (belum waktunya).
+     * - Only check-out (tanpa check-in) → simpan + INVALID.
+     * - Tidak membuat baris baru (wajib sudah disiapkan via prepare-today).
      *
-     * ⛏️ FIX: Jika check-in telat (>=09:00) TANPA "izin terlambat" disetujui,
-     *         maka status TETAP invalid meskipun pulang normal (tidak dibalik jadi hadir).
+     * NOTE: Jika check-in melewati batas (>= jam_masuk + masuk_tutup_sesudah) TANPA "izin terlambat",
+     *       maka status TETAP invalid walaupun pulang normal (tidak dibalik jadi hadir).
      */
     public function checkOut(Request $r)
     {
@@ -135,32 +172,39 @@ class PresensiController extends Controller
             return back()->with('error', 'Anda sedang masa tugas.');
         }
 
-        // Waktu minimal check-out
-        if ($now->lt($now->copy()->setTime(15,30,0))) {
-            return back()->with('error', 'Belum waktunya absen pulang.');
-        }
-
         // Ambil baris presensi hari ini — JANGAN BUAT KALAU TIDAK ADA
-        $pres = Presensi::where('karyawan_id', $idK)->whereDate('tanggal', $tgl)->first();
+        $pres = Presensi::with('jadwal.jamKerja')
+            ->where('karyawan_id', $idK)
+            ->whereDate('tanggal', $tgl)
+            ->first();
+
         if (!$pres) {
-            return back()->with('error', 'Belum ada jadwal presensi hari ini. Silakan coba lagi setelah jadwal dibuat oleh sistem.');
+            return back()->with('error', 'Belum ada jadwal presensi hari ini. Coba lagi setelah sistem menyiapkan presensi.');
         }
 
         if ($pres->jam_pulang) {
             return back()->with('error', 'Anda sudah absen pulang.');
         }
 
+        // Ambil konfigurasi jam kerja dari DB
+        $jk = $this->resolveJamKerjaForToday($pres, $tz, $tgl);
+        if (!$jk) {
+            return back()->with('error', 'Konfigurasi jam kerja belum terpasang pada jadwal hari ini. Hubungi admin.');
+        }
+
+        // Waktu minimal check-out: < checkoutOpen → tolak
+        if ($now->lt($jk['checkoutOpen'])) {
+            return back()->with('error', 'Belum waktunya absen pulang.');
+        }
+
         $path = $r->file('foto_pulang')->store('presensi_private/foto_pulang/'.$tgl, 'local');
 
-        // ⛏️ FIX: tentukan status checkout dengan mempertahankan "invalid karena telat tanpa izin".
-        // - Jika tidak ada jam_masuk → selalu invalid (only-out).
-        // - Jika ada jam_masuk:
-        //     * hitung apakah jam_masuk >= 09:00 dan TIDAK ada izin terlambat disetujui → invalid.
-        //     * selain itu → hadir.
+        // Tentukan status:
+        // - Tidak ada jam_masuk → INVALID (only-out)
+        // - Ada jam_masuk → cek terlambat tanpa izin menggunakan jam kerja dari DB
         $status = 'invalid';
         if ($pres->jam_masuk) {
             $jamMasukAt = Carbon::parse($pres->jam_masuk, $tz);
-            $lateCutoff = Carbon::parse($tgl . ' 09:00:00', $tz);
 
             $hasApprovedLate = Izin::where('karyawan_id', $idK)
                 ->where('jenis', 'izin terlambat')
@@ -169,8 +213,7 @@ class PresensiController extends Controller
                 ->whereDate('tanggal_selesai', '=', $tgl)
                 ->exists();
 
-            $isLateWithoutIzin = $jamMasukAt->gte($lateCutoff) && !$hasApprovedLate;
-
+            $isLateWithoutIzin = $jamMasukAt->gte($jk['checkinClose']) && !$hasApprovedLate;
             $status = $isLateWithoutIzin ? 'invalid' : 'hadir';
         }
 

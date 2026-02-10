@@ -26,7 +26,7 @@ class RoleMiddleware
     if (!in_array($current, $allowed, true)) {
         // Tentukan halaman fallback per role
         $redirect = match ($current) {
-            'superadmin' => 'superadmin.dashboard',   // atur sesuai route yang Anda buat
+            'superadmin' => 'co-admin.mode',   // atur sesuai route yang Anda buat
             'admin'      => 'admin.mode',             // sudah ada di routes Anda
             default      => 'user.home',              // user
         };

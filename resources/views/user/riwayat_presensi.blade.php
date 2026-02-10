@@ -5,16 +5,6 @@
     @php
         // Ambil bulan aktif dari controller; fallback ke query param / sekarang
         $month = $current_month ?? request('month', now()->format('Y-m'));
-
-        // Map warna status (badge + ring untuk kontras yang lebih baik)
-        $statusStyles = [
-            'hadir' => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
-            'terlambat' => 'bg-orange-100 text-orange-700 ring-1 ring-orange-200',
-            'izin' => 'bg-sky-100 text-sky-700 ring-1 ring-sky-200',
-            'sakit' => 'bg-violet-100 text-violet-700 ring-1 ring-violet-200',
-            'tidak hadir' => 'bg-red-100 text-red-700 ring-1 ring-red-200',
-            '-' => 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
-        ];
     @endphp
 
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
@@ -24,12 +14,9 @@
                 <div
                     class="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white
                   flex items-center justify-center shadow-md">
-                    {{-- calendar icon --}}
                     <img src="{{ asset('images/riwayat_presensi_white_icon.svg') }}" class="h-8 w-8" alt="">
                 </div>
-                <div>
-                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Riwayat Presensi</h1>
-                </div>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Riwayat Presensi</h1>
             </div>
         </div>
 
@@ -39,19 +26,18 @@
             <div class="relative w-full sm:w-64">
                 <input id="month" type="month" name="month" value="{{ $month }}"
                     class="w-full rounded-xl border border-gray-300 pl-10 pr-4 py-2.5 text-sm
-               focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
-               bg-white/80 backdrop-blur transition">
+                           focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
+                           bg-white/80 backdrop-blur transition">
             </div>
 
             <div class="flex gap-2">
                 <button type="submit"
                     class="inline-flex items-center justify-center rounded-xl border border-emerald-600 bg-emerald-600
-               text-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-emerald-700
-               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500
-               transition">
+                           text-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-emerald-700
+                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500
+                           transition">
                     Tampilkan
                 </button>
-
             </div>
         </form>
 
@@ -59,9 +45,10 @@
             // Normalisasi data (format string aman untuk tampilan)
             $normalized = $items->map(function ($row) {
                 $tgl = $row->tanggal ? $row->tanggal->format('Y-m-d') : '-';
-                $jm = $row->jam_masuk ? $row->jam_masuk->format('H:i') : '-';
-                $jp = $row->jam_pulang ? $row->jam_pulang->format('H:i') : '-';
-                $st = $row->status ?? '-';
+                $jm  = $row->jam_masuk ? $row->jam_masuk->format('H:i') : '-';
+                $jp  = $row->jam_pulang ? $row->jam_pulang->format('H:i') : '-';
+                // gunakan kolom yang benar
+                $st  = $row->status_presensi ?? '-';
                 return compact('tgl', 'jm', 'jp', 'st');
             });
         @endphp
@@ -80,17 +67,22 @@
             <div class="grid grid-cols-1 gap-3 sm:hidden">
                 @foreach ($normalized as $row)
                     @php
-                        $badge = $statusStyles[strtolower($row['st'])] ?? $statusStyles['-'];
+                        // samakan dengan contoh admin: normalisasi + match -> class
+                        $key = strtolower(trim($row['st'] ?? ''));
+                        $key = $key !== '' ? $key : '-';
+                        $badgeClass = match ($key) {
+                            'hadir'                 => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
+                            'alpa', 'invalid'       => 'bg-red-100 text-red-700 ring-1 ring-red-200',
+                            'izin', 'cuti', 'sakit' => 'bg-amber-100 text-amber-700 ring-1 ring-amber-200',
+                            default                 => 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
+                        };
                     @endphp
                     <article class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition">
                         <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-2">
-                                <span
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold
-                           uppercase tracking-wide {{ $badge }}">
-                                    {{ ucfirst($row['st']) }}
-                                </span>
-                            </div>
+                            <span
+                                class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $badgeClass }}">
+                                {{ $row['st'] ? ucfirst(trim($row['st'])) : '-' }}
+                            </span>
                             <time datetime="{{ $row['tgl'] }}" class="text-xs text-gray-500">
                                 {{ $row['tgl'] }}
                             </time>
@@ -125,7 +117,14 @@
                         <tbody class="divide-y divide-gray-100 text-sm">
                             @foreach ($normalized as $row)
                                 @php
-                                    $badge = $statusStyles[strtolower($row['st'])] ?? $statusStyles['-'];
+                                    $key = strtolower(trim($row['st'] ?? ''));
+                                    $key = $key !== '' ? $key : '-';
+                                    $badgeClass = match ($key) {
+                                        'hadir'                 => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
+                                        'alpa', 'invalid'       => 'bg-red-100 text-red-700 ring-1 ring-red-200',
+                                        'izin', 'cuti', 'sakit' => 'bg-amber-100 text-amber-700 ring-1 ring-amber-200',
+                                        default                 => 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
+                                    };
                                 @endphp
                                 <tr class="odd:bg-white even:bg-gray-50 hover:bg-emerald-50/40 transition">
                                     <td class="px-5 py-3 text-gray-800">
@@ -135,9 +134,8 @@
                                     <td class="px-5 py-3 text-gray-800">{{ $row['jp'] }}</td>
                                     <td class="px-5 py-3">
                                         <span
-                                            class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold {{ $badge }}">
-                                            <span class="h-1.5 w-1.5 rounded-full bg-current/70"></span>
-                                            {{ ucfirst($row['st']) }}
+                                            class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold {{ $badgeClass }}">
+                                            {{ $row['st'] ? ucfirst(trim($row['st'])) : '-' }}
                                         </span>
                                     </td>
                                 </tr>

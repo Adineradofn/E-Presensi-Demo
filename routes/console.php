@@ -7,39 +7,37 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Carbon;
-use App\Models\HariLibur; // ⬅️ tambahkan import model libur manual
+use App\Models\HariLibur;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Pakai timezone dari config (fallback Asia/Makassar)
+// Pakai timezone dari config, fallback ke Asia/Makassar
 $tz = config('app.timezone', 'Asia/Makassar');
 
 /**
- * Determinasi "libur hari ini?"
- * - PRIORITAS 1: Libur manual (tabel hari_libur) dengan rentang [tanggal_mulai..tanggal_selesai] (inklusif).
- *                Jika ada yang match → TRUE (libur).
- * - PRIORITAS 2: Libur nasional dari API eksternal.
- *                Jika API error → fallback FALSE (anggap bukan libur).
- * - Hasil dicache sampai akhir hari.
+ * Cek libur (true = libur) dari DB + fallback API, dengan cache harian.
+ * - DB MENANG: bila ada record yang overlap hari ini, langsung true.
+ * - Jika API error/invalid => anggap BUKAN libur (false) agar scheduler tetap jalan.
  */
-$isHoliday = function () use ($tz) {
-    $today = now($tz)->format('Y-m-d');
-    $ttl   = now($tz)->endOfDay()->diffInSeconds(now($tz));
+$isHoliday = function () use ($tz): bool {
+    $now    = now($tz);
+    $today  = $now->format('Y-m-d');
+    $ttl    = $now->endOfDay()->diffInSeconds($now);
 
     return Cache::remember("holiday:$today", $ttl, function () use ($tz, $today) {
-        // 1) Cek libur manual (override)
-        $hasManualHoliday = HariLibur::query()
+        // 1) CEK DB (overlap range)
+        $exists = HariLibur::query()
             ->whereDate('tanggal_mulai', '<=', $today)
             ->whereDate('tanggal_selesai', '>=', $today)
             ->exists();
 
-        if ($hasManualHoliday) {
-            return true; // ada libur manual → libur
+        if ($exists) {
+            return true; // DB veto
         }
 
-        // 2) Cek libur nasional via API (fallback)
+        // 2) FALLBACK API
         try {
             $now  = now($tz);
             $resp = Http::timeout(5)
@@ -57,36 +55,38 @@ $isHoliday = function () use ($tz) {
             foreach ($rows as $row) {
                 if (empty($row['holiday_date'])) continue;
 
-                // Normalisasi tanggal API → Y-m-d (zona lokal)
-                $date = Carbon::parse($row['holiday_date'])->timezone($tz)->format('Y-m-d');
+                $date = Carbon::parse($row['holiday_date'])
+                    ->timezone($tz)
+                    ->format('Y-m-d');
 
                 if ($date === $today) {
-                    // Hanya anggap libur jika bertipe libur nasional
                     return (bool)($row['is_national_holiday'] ?? false);
                 }
             }
-
             return false;
         } catch (\Throwable $e) {
-            Log::warning('Holiday API error: ' . $e->getMessage());
-            // Fallback: anggap bukan libur jika API bermasalah
-            return false;
+            Log::warning('Holiday API error: '.$e->getMessage());
+            return false; // fallback: tetap jalan
         }
     });
 };
 
 // ====================== Scheduler ======================
+// Pakai CRON DOW (Senin–Sabtu) agar Minggu tidak pernah jalan.
+// Prepare: 00:02, Finalize: 23:59. Libur nasional mem-veto via ->when().
 
 Schedule::command('presensi:prepare-today')
     ->timezone($tz)
-    ->dailyAt('00:02')
+    ->cron('2 0 * * 1-6')     // 00:02, Senin–Sabtu
+    ->onOneServer()
     ->withoutOverlapping()
     ->evenInMaintenanceMode()
-    ->when(fn () => ! $isHoliday()); // jalan hanya jika BUKAN libur (manual/ API)
+    ->when(fn () => ! $isHoliday());
 
 Schedule::command('presensi:finalize-today')
     ->timezone($tz)
-    ->dailyAt('23:59')
+    ->cron('59 23 * * 1-6')   // 23:59, Senin–Sabtu
+    ->onOneServer()
     ->withoutOverlapping()
     ->evenInMaintenanceMode()
-    ->when(fn () => ! $isHoliday()); // jalan hanya jika BUKAN libur (manual/ API)
+    ->when(fn () => ! $isHoliday());

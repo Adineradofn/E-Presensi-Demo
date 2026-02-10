@@ -71,24 +71,6 @@
                     </div>
                 </div>
 
-                {{-- Export data presensi (biarkan jika Anda pakai) --}}
-                @if (Route::has('admin.data.presensi.export'))
-                    <a href="{{ route(
-                        'admin.data.presensi.export',
-                        array_filter([
-                            'mode' => $mode,
-                            'date' => $mode === 'hari' ? $this->date ?? $current_date : null,
-                            'month'=> $mode === 'bulan'? $this->month ?? $current_month : null,
-                            'year' => $mode === 'tahun'? $this->year ?? $current_year : null,
-                            'q'    => $this->q ?: null,
-                        ]),
-                    ) }}"
-                        class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-600 text-emerald-700 px-3 py-2 hover:bg-emerald-50"
-                        title="Export CSV sesuai filter saat ini">
-                        <img src="{{ asset('images/export_icon.svg') }}" class="h-5 w-5" alt="export">
-                        Export
-                    </a>
-                @endif
             </div>
         </div>
 
@@ -107,7 +89,7 @@
         <div class="rounded-xl border border-gray-200 shadow-sm overflow-hidden hidden sm:block">
             <div class="overflow-x-auto">
                 <table class="min-w-full whitespace-nowrap">
-                    <thead class="bg-gray-50 text-left text-gray-700">
+                    <thead class="bg-gray-200 text-left text-gray-700">
                         <tr>
                             <th class="px-4 py-3 text-sm font-semibold">NIK</th>
                             <th class="px-4 py-3 text-sm font-semibold">Nama</th>
@@ -115,6 +97,8 @@
                             <th class="px-4 py-3 text-sm font-semibold">Jabatan</th>
                             <th class="px-4 py-3 text-sm font-semibold">Jam Masuk</th>
                             <th class="px-4 py-3 text-sm font-semibold">Jam Pulang</th>
+                            {{-- ⬇️ Kolom baru: Durasi Kerja --}}
+                            <th class="px-4 py-3 text-sm font-semibold">Durasi Kerja</th>
                             <th class="px-4 py-3 text-sm font-semibold">Tanggal</th>
                             <th class="px-4 py-3 text-sm font-semibold">Status Presensi</th>
                             <th class="px-4 py-3 text-sm font-semibold text-center">Aksi</th>
@@ -130,9 +114,33 @@
                                 $jm     = $row->jam_masuk ? $row->jam_masuk->format('H:i') : '-';
                                 $jp     = $row->jam_pulang ? $row->jam_pulang->format('H:i') : '-';
                                 $tgl    = $row->tanggal ? $row->tanggal->format('Y-m-d') : '-';
+
+                                // Status mentah untuk menentukan warna badge
                                 $status = $row->status_presensi;
 
-                                // Warna badge yang estetis (Tailwind)
+                                // ⬅️ PENTING: label KHUSUS tugas dari accessor model (satu function saja di model)
+                                // - 'hadir' + izin jenis 'tugas' → "Hadir (Tugas)"
+                                // - lainnya → ucfirst(status)
+                                $statusLabelTugas = $row->status_label_tugas;
+
+                                // Hitung Durasi Kerja:
+                                // - hanya untuk 'hadir' biasa (BUKAN "Hadir (Tugas)")
+                                // - lainnya tampil '-'
+                                $durasi = '-';
+                                $isHadir = strtolower((string) $status) === 'hadir';
+                                $isTugas = (str_contains(strtolower($statusLabelTugas ?? ''), 'tugas'))
+                                           || (strtolower((string)($row->izin->jenis ?? '')) === 'tugas');
+
+                                if ($isHadir && !$isTugas && $row->jam_masuk && $row->jam_pulang) {
+                                    try {
+                                        $seconds = $row->jam_masuk->diffInSeconds($row->jam_pulang);
+                                        $durasi = gmdate('H:i:s', max(0, $seconds));
+                                    } catch (\Throwable $e) {
+                                        $durasi = '-';
+                                    }
+                                }
+
+                                // Warna badge berdasarkan status mentah (enum DB tidak diubah)
                                 $badgeClass = match (strtolower((string) $status)) {
                                     'hadir'                 => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
                                     'alpa'                  => 'bg-red-100 text-red-700 ring-1 ring-red-200',
@@ -141,9 +149,9 @@
                                     default                 => 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
                                 };
 
-                                $hasMasuk = filled($row->foto_masuk);
-                                $hasPulang= filled($row->foto_pulang);
-                                $hasFoto  = $hasMasuk || $hasPulang;
+                                $hasMasuk  = filled($row->foto_masuk);
+                                $hasPulang = filled($row->foto_pulang);
+                                $hasFoto   = $hasMasuk || $hasPulang;
 
                                 $urlMasuk = $hasMasuk
                                     ? route('admin.data.presensi.foto.show', ['presensi' => $row->id, 'jenis' => 'masuk'])
@@ -159,10 +167,12 @@
                                 <td class="px-4 py-3 text-sm text-gray-700">{{ $jabatan }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-700">{{ $jm }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-700">{{ $jp }}</td>
+                                {{-- ⬇️ Sel baru: Durasi Kerja --}}
+                                <td class="px-4 py-3 text-sm text-gray-700">{{ $durasi }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-700">{{ $tgl }}</td>
                                 <td class="px-4 py-3 text-sm">
                                     <span class="px-2 py-1 rounded-full text-xs font-medium {{ $badgeClass }}">
-                                        {{ ucfirst($status) }}
+                                        {{ $statusLabelTugas }} {{-- ⬅️ tampilkan "Hadir (Tugas)" bila applicable --}}
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-sm">
@@ -183,7 +193,8 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-4 py-6 text-center text-sm text-gray-500">
+                                {{-- ⬇️ update colspan dari 9 ke 10 karena kolom baru --}}
+                                <td colspan="10" class="px-4 py-6 text-center text-sm text-gray-500">
                                     Belum ada data presensi pada rentang ini.
                                 </td>
                             </tr>
@@ -193,7 +204,7 @@
             </div>
         </div>
 
-        {{-- Mobile Card (hapus tombol edit) --}}
+        {{-- Mobile Card --}}
         <div class="sm:hidden space-y-3 mt-2">
             @forelse($items as $row)
                 @php
@@ -204,9 +215,26 @@
                     $jm     = $row->jam_masuk ? $row->jam_masuk->format('H:i') : '-';
                     $jp     = $row->jam_pulang ? $row->jam_pulang->format('H:i') : '-';
                     $tgl    = $row->tanggal ? $row->tanggal->format('Y-m-d') : '-';
+
                     $status = $row->status_presensi;
 
-                    // Konsisten dengan tabel desktop
+                    // ⬅️ gunakan accessor yang sama di mobile
+                    $statusLabelTugas = $row->status_label_tugas;
+
+                    // Hitung durasi untuk mobile (logic sama)
+                    $durasi = '-';
+                    $isHadir = strtolower((string) $status) === 'hadir';
+                    $isTugas = (str_contains(strtolower($statusLabelTugas ?? ''), 'tugas'))
+                               || (strtolower((string)($row->izin->jenis ?? '')) === 'tugas');
+                    if ($isHadir && !$isTugas && $row->jam_masuk && $row->jam_pulang) {
+                        try {
+                            $seconds = $row->jam_masuk->diffInSeconds($row->jam_pulang);
+                            $durasi = gmdate('H:i:s', max(0, $seconds));
+                        } catch (\Throwable $e) {
+                            $durasi = '-';
+                        }
+                    }
+
                     $badgeClass = match (strtolower((string) $status)) {
                         'hadir'                 => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
                         'alpa'                  => 'bg-red-100 text-red-700 ring-1 ring-red-200',
@@ -215,9 +243,9 @@
                         default                 => 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
                     };
 
-                    $hasMasuk = filled($row->foto_masuk);
-                    $hasPulang= filled($row->foto_pulang);
-                    $hasFoto  = $hasMasuk || $hasPulang;
+                    $hasMasuk  = filled($row->foto_masuk);
+                    $hasPulang = filled($row->foto_pulang);
+                    $hasFoto   = $hasMasuk || $hasPulang;
 
                     $urlMasuk = $hasMasuk
                         ? route('admin.data.presensi.foto.show', ['presensi' => $row->id, 'jenis' => 'masuk'])
@@ -236,15 +264,18 @@
                         </div>
                         <div class="shrink-0">
                             <span class="inline-block px-2 py-1 rounded-full text-[11px] font-medium {{ $badgeClass }}">
-                                {{ ucfirst($status) }}
+                                {{ $statusLabelTugas }} {{-- ⬅️ konsisten dengan tabel --}}
                             </span>
                         </div>
                     </div>
 
+                    {{-- grid tetap 3 kolom; item ke-4 otomatis turun baris, tidak mengubah desain --}}
                     <div class="mt-3 grid grid-cols-3 gap-2 text-[12px]">
                         <div class="rounded-lg bg-gray-50 p-2"><div class="text-gray-500">Masuk</div><div class="font-medium text-gray-900">{{ $jm }}</div></div>
                         <div class="rounded-lg bg-gray-50 p-2"><div class="text-gray-500">Pulang</div><div class="font-medium text-gray-900">{{ $jp }}</div></div>
                         <div class="rounded-lg bg-gray-50 p-2"><div class="text-gray-500">Tanggal</div><div class="font-medium text-gray-900">{{ $tgl }}</div></div>
+                        {{-- ⬇️ Item baru: Durasi Kerja --}}
+                        <div class="rounded-lg bg-gray-50 p-2"><div class="text-gray-500">Durasi</div><div class="font-medium text-gray-900">{{ $durasi }}</div></div>
                     </div>
 
                     <div class="mt-4 flex items-center gap-2">

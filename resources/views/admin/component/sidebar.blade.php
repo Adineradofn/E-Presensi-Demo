@@ -13,12 +13,13 @@
         {{-- Tombol toggle (mobile). Fixed, tampil saat sidebar tertutup --}}
         <button x-show="!open" x-cloak @click="open = true" :aria-expanded="open.toString()" aria-label="Open sidebar"
             class="md:hidden fixed z-[60]
-                   top-[calc(env(safe-area-inset-top,0)+1rem)]
-                   left-[calc(env(safe-area-inset-left,0)+1rem)]
-                   bg-emerald-600 text-white p-2 rounded-full shadow-lg ring-1 ring-black/10"
+           top-[calc(env(safe-area-inset-top,0)+1rem)]
+           left-[calc(env(safe-area-inset-left,0)+1rem)]
+           bg-emerald-600 text-white p-2 rounded-full shadow-lg ring-1 ring-black/10"
             x-transition>
-            <img src="{{ asset('images/hamburger_icon.svg') }}" class="h-8 w-8" alt="Open menu">
+            <img src="{{ asset('images/hamburger_icon.svg') }}" class="h-6 w-6" alt="hamburger" loading="lazy">
         </button>
+
 
         {{-- Sidebar DESKTOP (md+): selalu terlihat, ditempel kiri layar --}}
         <aside class="hidden md:block w-64 h-screen bg-white fixed left-0 top-0 z-30 border-r border-gray-200"

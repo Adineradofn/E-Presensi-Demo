@@ -43,8 +43,8 @@
           type="button"
           class="inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/60"
           aria-label="Tutup modal"
-          @click="close()"
-        >
+          @click="close()
+        ">
           <img src="{{ asset('images/cancel_icon.svg') }}" class="h-6 w-6" alt="Tutup">
         </button>
       </div>

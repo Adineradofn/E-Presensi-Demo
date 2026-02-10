@@ -17,7 +17,7 @@
            bg-emerald-600 text-white p-2 rounded-full shadow-lg ring-1 ring-black/10"
     x-transition
   >
-    <img src="{{ asset('images/hamburger_icon.svg') }}" class="h-5 w-5" alt="hamburger" loading="lazy">
+    <img src="{{ asset('images/hamburger_icon.svg') }}" class="h-6 w-6" alt="hamburger" loading="lazy">
   </button>
 
   {{-- Desktop sidebar (md+) --}}

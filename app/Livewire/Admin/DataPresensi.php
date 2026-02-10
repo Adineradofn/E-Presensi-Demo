@@ -15,6 +15,7 @@ use Livewire\Attributes\Title;
  * Komponen Admin: Data Presensi
  * - Hapus fitur edit status
  * - Tampilkan data presensi sesuai filter
+ * - Eager load 'izin' untuk label "Hadir (Tugas)"
  */
 #[Layout('admin.app_admin')]
 #[Title('Data Presensi')]
@@ -63,7 +64,6 @@ class DataPresensi extends Component
     public function updatingDate()  { $this->resetPage(); }
     public function updatingMonth() { $this->resetPage(); }
     public function updatingYear()  { $this->resetPage(); }
-
     public function updatingPerPage() { $this->resetPage(); }
 
     public function updatedPerPage($value)
@@ -113,7 +113,8 @@ class DataPresensi extends Component
     {
         [$start, $end] = $this->resolveRange();
 
-        $query = Presensi::with('karyawan')
+        // ⬇️ Penting: eager-load 'karyawan' + 'izin' agar accessor tidak N+1
+        $query = Presensi::with(['karyawan','izin'])
             ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()]);
 
         if ($this->q !== '') {

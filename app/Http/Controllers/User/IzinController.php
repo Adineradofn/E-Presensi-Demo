@@ -50,22 +50,24 @@ class IzinController extends Controller
             'tanggal_mulai'    => ['required', 'date', 'after_or_equal:today'],
             'tanggal_selesai'  => ['nullable', 'date'],
             'alasan'           => ['required', 'string', 'max:255'],
-            'bukti'            => ['nullable','file','mimes:jpg,jpeg,png,heic,heif,pdf','max:10240'],
+            // Bukti sekarang WAJIB
+            'bukti'            => ['required','file','mimes:jpg,jpeg,png,heic,heif,pdf','max:10240'],
         ];
 
         $messages = [
-            'required'       => ':attribute wajib diisi.',
-            'date'           => ':attribute harus berupa tanggal yang valid.',
-            'after_or_equal' => ':attribute tidak boleh sebelum hari ini.',
-            'string'         => ':attribute harus berupa teks.',
-            'max.string'     => ':attribute maksimal :max karakter.',
-            'file'           => ':attribute harus berupa file.',
-            'mimes'          => ':attribute harus dalam format: jpg, jpeg, png, heic, heif, atau pdf.',
-            'max.file'       => 'Ukuran :attribute maksimal 10 MB.',
+            'required'         => ':attribute wajib diisi.',
+            'bukti.required'   => 'Bukti wajib diunggah.',
+            'date'             => ':attribute harus berupa tanggal yang valid.',
+            'after_or_equal'   => ':attribute tidak boleh sebelum hari ini.',
+            'string'           => ':attribute harus berupa teks.',
+            'max.string'       => ':attribute maksimal :max karakter.',
+            'file'             => ':attribute harus berupa file.',
+            'mimes'            => ':attribute harus dalam format: jpg, jpeg, png, heic, heif, atau pdf.',
+            'max.file'         => 'Ukuran :attribute maksimal 10 MB.',
 
-            'bukti.file'     => 'Bukti harus berupa file yang valid.',
-            'bukti.mimes'    => 'Bukti harus berformat JPG, JPEG, PNG, HEIC, HEIF, atau PDF.',
-            'bukti.max'      => 'Ukuran bukti maksimal 10 MB.',
+            'bukti.file'       => 'Bukti harus berupa file yang valid.',
+            'bukti.mimes'      => 'Bukti harus berformat JPG, JPEG, PNG, HEIC, HEIF, atau PDF.',
+            'bukti.max'        => 'Ukuran bukti maksimal 10 MB.',
         ];
 
         $attributes = [
@@ -104,7 +106,7 @@ class IzinController extends Controller
                 ->withInput();
         }
 
-        // Simpan bukti ke disk 'local' (opsional)
+        // Simpan bukti ke disk 'local' (wajib ada)
         $path = null;
         if ($r->hasFile('bukti')) {
             $folder = 'izin_private/'.$now->format('Y-m');
@@ -127,7 +129,7 @@ class IzinController extends Controller
             'status'            => $status,
         ]);
 
-        // Recalculate range secara instan (observer juga akan memanggil; idempoten)
+        // Recalculate range secara instan
         $this->svc->recalculateRange($karyawan->id, $mulai, $seles);
 
         return back()->with('success', 'Pengajuan izin berhasil dikirim.');

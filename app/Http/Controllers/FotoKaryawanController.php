@@ -9,22 +9,21 @@ use Symfony\Component\HttpFoundation\Response;
 
 class FotoKaryawanController extends Controller
 {
-    /** ADMIN: boleh lihat foto siapa saja. */
+    /** ADMIN & CO-ADMIN: boleh lihat foto siapa saja. */
     public function photoAdmin(Karyawan $karyawan)
     {
         $user = Auth::user();
-        if (!$user) {
-            abort(Response::HTTP_UNAUTHORIZED);
-        }
+        if (!$user) abort(Response::HTTP_UNAUTHORIZED);
 
-        $isAdmin =
-            (method_exists($user, 'hasRole') && $user->hasRole('admin')) ||
-            (($user->role ?? null) === 'admin') ||
-            ((optional($user->karyawan)->role ?? null) === 'admin');
+        $roleFromUser     = strtolower((string) ($user->role ?? ''));
+        $roleFromRelation = strtolower((string) (optional($user->karyawan)->role ?? ''));
+        $role = $roleFromUser ?: $roleFromRelation;
 
-        if (!$isAdmin) {
-            abort(Response::HTTP_FORBIDDEN);
-        }
+        $isAdminOrCoAdmin =
+            (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'co-admin'])) ||
+            in_array($role, ['admin', 'co-admin'], true);
+
+        if (!$isAdminOrCoAdmin) abort(Response::HTTP_FORBIDDEN);
 
         return $this->streamPhotoOr404($karyawan);
     }
@@ -33,16 +32,10 @@ class FotoKaryawanController extends Controller
     public function photoSelf(Karyawan $karyawan)
     {
         $user = Auth::user();
-        if (!$user) {
-            abort(Response::HTTP_UNAUTHORIZED);
-        }
+        if (!$user) abort(Response::HTTP_UNAUTHORIZED);
 
-        // gunakan id_karyawan jika ada, fallback ke id user
         $ownId = $user->id_karyawan ?? $user->id;
-
-        if ((int) $ownId !== (int) $karyawan->getKey()) {
-            abort(Response::HTTP_FORBIDDEN);
-        }
+        if ((int) $ownId !== (int) $karyawan->getKey()) abort(Response::HTTP_FORBIDDEN);
 
         return $this->streamPhotoOr404($karyawan);
     }
@@ -57,7 +50,7 @@ class FotoKaryawanController extends Controller
 
         return response()->file($path, [
             'Content-Type'        => @mime_content_type($path) ?: 'application/octet-stream',
-            'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            'Content-Disposition' => 'inline; filename="'.basename($path).'"',
             'Cache-Control'       => 'private, no-store, max-age=0',
         ]);
     }
