@@ -6,8 +6,8 @@
     },
     "routes": [
         {
-            "src": "/(css|js|build|assets|storage)/(.*)",
-            "dest": "/public/$1/$2"
+            "src": "/(build|css|js|assets|storage)/(.*)",
+            "dest": "/$1/$2"
         },
         {
             "src": "/(.*)",
